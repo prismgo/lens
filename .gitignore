@@ -1,0 +1,13 @@
+.idea
+.DS_Store
+.vscode
+tmp/
+.coverage/
+.claude
+.codex
+.trae
+openspec.yaml
+openspec/
+docs/superpowers/
+coverage.out
+docs/changes/
