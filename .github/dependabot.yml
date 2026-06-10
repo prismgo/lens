@@ -2,10 +2,16 @@ version: 2
 updates:
   - package-ecosystem: gomod
     directory: /
+    # Keep Lens Go module dependencies current without changing the release flow.
     schedule:
       interval: daily
+    groups:
+      go-dependencies:
+        patterns:
+          - "*"
   - package-ecosystem: github-actions
     directory: /
+    # Group workflow action updates so CI maintenance arrives as one reviewable change.
     groups:
       actions:
         patterns:

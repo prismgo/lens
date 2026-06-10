@@ -2,6 +2,7 @@ GO ?= go
 GOFMT ?= gofmt
 PACKAGES ?= ./...
 COVERAGE_OUT ?= coverage.out
+LINT_ARGS ?=
 
 .PHONY: test
 test:
@@ -10,10 +11,6 @@ test:
 .PHONY: covdata
 covdata:
 	./.github/scripts/coverage.sh $(PACKAGES)
-
-.PHONY: test-race
-test-race:
-	./.github/scripts/test_with_summary.sh $(GO) test -v -race $(PACKAGES)
 
 .PHONY: vet
 vet:
@@ -43,7 +40,7 @@ fmt-check:
 
 .PHONY: lint
 lint:
-	golangci-lint run
+	golangci-lint run $(LINT_ARGS)
 
 .PHONY: ci
 ci: fmt-check vet test

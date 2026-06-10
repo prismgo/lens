@@ -1,34 +1,51 @@
-name: Feature Request
-description: Suggest an improvement for Prismgo.
+name: 功能建议
+description: 为 Prismgo Lens 提出改进建议。
 labels: ["type/proposal"]
 body:
   - type: markdown
     attributes:
       value: |
-        Please check existing issues before opening a new feature request.
+        提交前请先检查已有 issue，避免重复建议。
   - type: textarea
     id: description
     attributes:
-      label: Feature Description
-      description: Describe the feature or behavior you want Prismgo to support.
-      placeholder: I think Prismgo should support...
+      label: 功能描述
+      description: 描述你希望 Prismgo Lens 支持的能力或行为。
+      placeholder: 我希望 Prismgo Lens 支持...
+    validations:
+      required: true
+  - type: dropdown
+    id: lens-area
+    attributes:
+      label: Lens 能力范围
+      description: 选择这个建议最相关的能力范围。
+      options:
+        - CLI
+        - MCP
+        - Agent 配置
+        - 宿主项目检测
+        - 文档搜索
+        - 浏览器日志
+        - 技能管理
+        - .prismgo-lens.json 配置
+        - 其他
     validations:
       required: true
   - type: textarea
     id: use-case
     attributes:
-      label: Use Case
-      description: Explain the problem this feature solves and who needs it.
+      label: 使用场景
+      description: 说明这个功能解决什么问题，以及谁会使用它。
     validations:
       required: true
   - type: textarea
     id: proposed-api
     attributes:
-      label: Proposed API or Behavior
-      description: Describe the API, command, configuration, or behavior you expect.
-      render: go
+      label: 期望 CLI/API/MCP/配置行为
+      description: 描述你期望的命令、API、MCP 工具、配置格式或行为。
+      render: shell
   - type: textarea
     id: alternatives
     attributes:
-      label: Alternatives Considered
-      description: Describe workarounds or alternative designs you considered.
+      label: 备选方案或当前绕行方式
+      description: 描述你现在如何绕过这个问题，或考虑过哪些替代设计。

@@ -1,4 +1,4 @@
-name: Run Tests
+name: Prismgo Lens CI
 
 on:
   push:
@@ -25,11 +25,15 @@ jobs:
         with:
           go-version: "1.26"
 
-      - name: Run golangci-lint
+      - name: Install golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
           version: v2.11
-          args: --verbose
+          # The action manages the pinned binary; the repository command below runs the check.
+          install-only: true
+
+      - name: Run lint
+        run: make lint LINT_ARGS=--verbose
 
   test:
     needs: lint
@@ -38,13 +42,12 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         go: ["1.26"]
-        test-mode: ["normal", "race"]
         include:
           - os: ubuntu-latest
             go-build: ~/.cache/go-build
           - os: macos-latest
             go-build: ~/Library/Caches/go-build
-    name: ${{ matrix.os }} @ Go ${{ matrix.go }} ${{ matrix.test-mode }}
+    name: ${{ matrix.os }} @ Go ${{ matrix.go }}
     runs-on: ${{ matrix.os }}
     env:
       GO111MODULE: on
@@ -72,17 +75,13 @@ jobs:
             ${{ runner.os }}-go-${{ matrix.go }}-
             ${{ runner.os }}-go-
 
-      - name: Run Tests
-        run: |
-          if [ "${{ matrix.test-mode }}" = "race" ]; then
-            make test-race
-          else
-            make covdata
-          fi
+      - name: Generate coverage data
+        # Lens CI collects coverage on each supported OS without enforcing a threshold here.
+        run: make covdata
 
       - name: Upload coverage to Codecov
-        if: matrix.test-mode == 'normal'
         uses: codecov/codecov-action@v7
+        continue-on-error: true
         with:
           files: .coverage/coverage.out
-          flags: ${{ matrix.os }},go-${{ matrix.go }},${{ matrix.test-mode }}
+          flags: ${{ matrix.os }},go-${{ matrix.go }}

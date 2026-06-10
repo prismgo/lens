@@ -1,72 +1,97 @@
-name: Bug Report
-description: Found unexpected behavior in Prismgo? Report it here.
+name: 缺陷报告
+description: 发现 Prismgo Lens 的异常行为时，请在这里报告。
 labels: ["type/bug"]
 body:
   - type: markdown
     attributes:
       value: |
-        If this is a security issue, do not open a public issue.
-        Please report it privately through GitHub Security Advisory.
+        如果这是安全问题，请不要创建公开 issue。
+        请通过 GitHub Security Advisory 私下报告。
   - type: markdown
     attributes:
       value: |
-        Before opening a bug report, please check the existing issues and make sure you are using a current Prismgo version or commit.
+        提交前请先检查已有 issue，并确认你使用的是当前 Prismgo Lens 版本或提交。
   - type: textarea
     id: description
     attributes:
-      label: Description
-      description: Describe the problem and include links or context that help explain it.
+      label: 问题描述
+      description: 描述问题，并附上有助于理解上下文的链接或说明。
     validations:
       required: true
   - type: input
-    id: prismgo-version
+    id: lens-version
     attributes:
-      label: Prismgo Version
-      description: Prismgo version or commit reference.
+      label: Lens 版本或提交
+      description: Prismgo Lens 版本号或提交引用。
       placeholder: v0.0.0 or 5226a82
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: 执行命令
+      description: 触发问题的 prismgo-lens 命令或调用方式。
+      render: shell
+    validations:
+      required: true
+  - type: dropdown
+    id: lens-area
+    attributes:
+      label: 涉及能力范围
+      description: 选择最接近的 Prismgo Lens 能力范围。
+      options:
+        - CLI
+        - MCP
+        - Agent 配置
+        - 宿主项目检测
+        - 文档搜索
+        - 浏览器日志
+        - 技能管理
+        - .prismgo-lens.json 配置
+        - 其他
     validations:
       required: true
   - type: dropdown
     id: can-reproduce
     attributes:
-      label: Can you reproduce the bug?
-      description: If yes, include the steps or code in the minimal reproduction field.
+      label: 是否可以复现？
+      description: 如果可以，请在最小复现步骤中填写命令、配置或操作流程。
       options:
-        - "Yes"
-        - "No"
+        - "是"
+        - "否"
     validations:
       required: true
   - type: textarea
     id: reproduction
     attributes:
-      label: Minimal Reproduction
-      description: Provide the smallest code sample, command, or configuration that reproduces the issue.
-      render: go
+      label: 最小复现步骤
+      description: 提供能复现问题的最小命令、配置或操作步骤。
+      render: shell
   - type: textarea
     id: expected-behavior
     attributes:
-      label: Expected Behavior
-      description: Describe what you expected to happen.
+      label: 期望行为
+      description: 描述你期望发生的结果。
   - type: textarea
     id: actual-behavior
     attributes:
-      label: Actual Behavior
-      description: Describe what actually happened.
+      label: 实际行为
+      description: 描述实际发生的结果。
   - type: textarea
     id: logs
     attributes:
-      label: Logs or Error Output
-      description: Paste relevant logs, panic output, or command output.
+      label: 日志或错误输出
+      description: 粘贴相关日志、panic 输出或命令输出。
       render: shell
   - type: input
     id: go-version
     attributes:
-      label: Go Version
-      description: Output of `go version`.
+      label: Go 版本
+      description: '`go version` 的输出。'
       placeholder: go version go1.26.2 linux/amd64
   - type: input
     id: os-version
     attributes:
-      label: Operating System
-      description: OS and architecture used to run Prismgo.
+      label: 操作系统
+      description: 运行 Prismgo Lens 的操作系统和架构。
       placeholder: Ubuntu 24.04 amd64

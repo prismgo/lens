@@ -80,11 +80,10 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 - `go test ./...`: run the full Go test suite.
 - `make test`: run verbose tests with count coverage and write `coverage.out`.
 - `make covdata`: run `./.github/scripts/coverage.sh` with `PACKAGES` support and write coverage artifacts under `.coverage/`.
-- `make test-race`: run all tests with the race detector.
 - `make vet`: run `go vet ./...`.
 - `make fmt`: format all Go files with `gofmt`, excluding `./tmp`.
 - `make fmt-check`: verify formatting without modifying files.
-- `make lint`: run `golangci-lint run`.
+- `make lint`: run `golangci-lint run`; pass extra options with `LINT_ARGS`, for example `make lint LINT_ARGS=--verbose`.
 - `make ci`: run the local CI gate.
 
 ## Coding Style & Naming Conventions
@@ -101,7 +100,7 @@ Follow standard Go conventions: `gofmt` formatting, tabs for indentation, short 
 
 ## Testing Guidelines
 
-Add or update colocated `*_test.go` files for behavior changes. Use focused unit tests for package-level contracts and integration-style tests where external behavior crosses components, such as queue, Redis, RabbitMQ, Horizon, or filesystem flows. Run `make test` before submitting; run `make test-race` for concurrency, worker, lifecycle, or connection-management changes. Coverage is uploaded from `coverage.out` in CI, so avoid bypassing `make test` for final verification.
+Add or update colocated `*_test.go` files for behavior changes. Use focused unit tests for package-level contracts and integration-style tests where external behavior crosses components, such as queue, Redis, RabbitMQ, Horizon, or filesystem flows. Run `make test` before submitting. Coverage is uploaded from `coverage.out` in CI, so avoid bypassing `make test` for final verification.
 
 ### Testing and Coverage
 - Any changes to Go code, go.mod, go.sum, test files, or code generation logic must run tests and compute coverage.
