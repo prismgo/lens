@@ -86,11 +86,22 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 - `make lint`: run `golangci-lint run`; pass extra options with `LINT_ARGS`, for example `make lint LINT_ARGS=--verbose`.
 - `make ci`: run the local CI gate.
 
-## Coding Style & Naming Conventions
+## Coding Style & Coding Standards
 
 Follow standard Go conventions: `gofmt` formatting, tabs for indentation, short package names, exported identifiers in `PascalCase`, and unexported identifiers in `camelCase`. Keep package APIs idiomatic and consistent with nearby components. 
 
-### Code Comments:
+### General Principles
+- Prefer code reuse over reimplementation
+  - If existing code doesn't fit or has unclear boundaries, refactor properly
+- Follow single responsibility principle
+  - For functions, structs, interfaces, files, packages, etc.
+  - Keep boundaries clear and reasonable
+- Prefer Go standard library; minimize third-party dependencies
+  - Adding a new library requires user approval
+- Favor explicit logic over implicit behavior
+- Use consistent and clear naming (classes, functions, variables, tables, fields)
+
+### Code Comments
 - Modified and newly added code must include comments
   - Explanation of the logic
   - Design rationale
@@ -116,7 +127,7 @@ Add or update colocated `*_test.go` files for behavior changes. Use focused unit
 
 Do not commit secrets, local credentials, coverage files, or temporary runtime data. 
 
-### 9. Checklist
+## Checklist
 After completing a feature, the following must be performed:
 
 1. Check for orphaned (dead) code
