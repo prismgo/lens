@@ -898,7 +898,7 @@ func TestBrowserProxyInjectsHTMLLeavesJSONAndStoresBrowserLogs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get html through proxy: %v", err)
 	}
-	defer html.Body.Close()
+	defer closeTestResource(t, "html response body", html.Body.Close)
 	htmlBody, _ := io.ReadAll(html.Body)
 	if !strings.Contains(string(htmlBody), "/_prismgo_lens/browser-logs") {
 		t.Fatalf("html response should contain injected logger: %s", htmlBody)
@@ -908,7 +908,7 @@ func TestBrowserProxyInjectsHTMLLeavesJSONAndStoresBrowserLogs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get json through proxy: %v", err)
 	}
-	defer jsonResponse.Body.Close()
+	defer closeTestResource(t, "json response body", jsonResponse.Body.Close)
 	jsonBody, _ := io.ReadAll(jsonResponse.Body)
 	if string(jsonBody) != `{"ok":true}` {
 		t.Fatalf("json response should be unchanged: %s", jsonBody)
@@ -918,7 +918,7 @@ func TestBrowserProxyInjectsHTMLLeavesJSONAndStoresBrowserLogs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("post browser log: %v", err)
 	}
-	defer logResponse.Body.Close()
+	defer closeTestResource(t, "log response body", logResponse.Body.Close)
 	if logResponse.StatusCode != http.StatusNoContent {
 		t.Fatalf("browser log status = %d", logResponse.StatusCode)
 	}
@@ -928,6 +928,14 @@ func TestBrowserProxyInjectsHTMLLeavesJSONAndStoresBrowserLogs(t *testing.T) {
 	}
 	if !strings.Contains(string(data), "boom") {
 		t.Fatalf("browser log was not persisted: %s", data)
+	}
+}
+
+// closeTestResource reports cleanup failures from deferred test resources.
+func closeTestResource(t *testing.T, label string, close func() error) {
+	t.Helper()
+	if err := close(); err != nil {
+		t.Fatalf("close %s: %v", label, err)
 	}
 }
 

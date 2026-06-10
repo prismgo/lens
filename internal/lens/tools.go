@@ -492,12 +492,12 @@ func normalizeDatabaseDriver(driver string) string {
 	}
 }
 
-func mysqlDatabaseSchema(root string, connection string, mode string, filter string, includeColumnDetails bool) (any, error) {
+func mysqlDatabaseSchema(root string, connection string, mode string, filter string, includeColumnDetails bool) (result any, err error) {
 	db, database, err := openDatabaseConnection(root, connection)
 	if err != nil {
 		return nil, err
 	}
-	defer db.Close()
+	defer mergeCloseError(&err, db.Close)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	query := `SELECT TABLE_NAME, TABLE_TYPE, TABLE_ROWS FROM information_schema.TABLES WHERE TABLE_SCHEMA = ?`
@@ -511,7 +511,7 @@ func mysqlDatabaseSchema(root string, connection string, mode string, filter str
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer mergeCloseError(&err, rows.Close)
 	tables := []map[string]any{}
 	for rows.Next() {
 		var name, tableType string
@@ -551,12 +551,12 @@ func mysqlDatabaseSchema(root string, connection string, mode string, filter str
 	return map[string]any{"driver": "mysql", "database": database, "tables": tables}, rows.Err()
 }
 
-func postgresDatabaseSchema(root string, connection string, mode string, filter string, includeColumnDetails bool) (any, error) {
+func postgresDatabaseSchema(root string, connection string, mode string, filter string, includeColumnDetails bool) (result any, err error) {
 	db, schema, err := openDatabaseConnection(root, connection)
 	if err != nil {
 		return nil, err
 	}
-	defer db.Close()
+	defer mergeCloseError(&err, db.Close)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	query := `SELECT table_name, table_type FROM information_schema.tables WHERE table_schema = $1`
@@ -570,7 +570,7 @@ func postgresDatabaseSchema(root string, connection string, mode string, filter 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer mergeCloseError(&err, rows.Close)
 	tables := []map[string]any{}
 	for rows.Next() {
 		var name, tableType string
@@ -602,12 +602,12 @@ func postgresDatabaseSchema(root string, connection string, mode string, filter 
 	return map[string]any{"driver": "postgres", "schema": schema, "tables": tables}, rows.Err()
 }
 
-func sqliteDatabaseSchema(root string, connection string, mode string, filter string, includeColumnDetails bool) (any, error) {
+func sqliteDatabaseSchema(root string, connection string, mode string, filter string, includeColumnDetails bool) (result any, err error) {
 	db, database, err := openDatabaseConnection(root, connection)
 	if err != nil {
 		return nil, err
 	}
-	defer db.Close()
+	defer mergeCloseError(&err, db.Close)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	query := `SELECT name, type, sql FROM sqlite_master WHERE type IN ('table','view') AND name NOT LIKE 'sqlite_%'`
@@ -624,7 +624,7 @@ func sqliteDatabaseSchema(root string, connection string, mode string, filter st
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer mergeCloseError(&err, rows.Close)
 	tables := []map[string]any{}
 	for rows.Next() {
 		var name, tableType string
@@ -660,7 +660,7 @@ func sqliteDatabaseSchema(root string, connection string, mode string, filter st
 	return map[string]any{"driver": "sqlite", "database": database, "tables": tables}, rows.Err()
 }
 
-func databaseQueryTool(root string, args json.RawMessage) (any, error) {
+func databaseQueryTool(root string, args json.RawMessage) (result any, err error) {
 	var input struct {
 		SQL        string `json:"sql"`
 		Connection string `json:"connection"`
@@ -686,14 +686,14 @@ func databaseQueryTool(root string, args json.RawMessage) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer db.Close()
+	defer mergeCloseError(&err, db.Close)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	rows, err := db.QueryContext(ctx, input.SQL)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer mergeCloseError(&err, rows.Close)
 	columns, err := rows.Columns()
 	if err != nil {
 		return nil, err
@@ -1043,7 +1043,7 @@ type githubJSONDocsProvider struct {
 
 // Search 调用预构建的 GitHub 文档 JSON 索引端点。
 // 参数用途：root 保留给 provider 定位项目缓存目录；当前实现不写缓存，失败由上层 fallback 到本地搜索。
-func (provider githubJSONDocsProvider) Search(root string, queries []string, packages []string, limit int) ([]map[string]any, error) {
+func (provider githubJSONDocsProvider) Search(root string, queries []string, packages []string, limit int) (results []map[string]any, err error) {
 	request, err := http.NewRequest(http.MethodGet, provider.Endpoint, nil)
 	if err != nil {
 		return nil, err
@@ -1063,7 +1063,7 @@ func (provider githubJSONDocsProvider) Search(root string, queries []string, pac
 	if err != nil {
 		return nil, err
 	}
-	defer response.Body.Close()
+	defer mergeCloseError(&err, response.Body.Close)
 	if response.StatusCode == http.StatusTooManyRequests {
 		return nil, fmt.Errorf("github docs provider rate limited: HTTP %d", response.StatusCode)
 	}
@@ -1376,13 +1376,13 @@ func shouldResolveSQLitePath(database string) bool {
 	return database != ":memory:" && !strings.HasPrefix(lower, "file:")
 }
 
-func loadMySQLColumns(ctx context.Context, db *sql.DB, database string, table string) ([]map[string]any, error) {
+func loadMySQLColumns(ctx context.Context, db *sql.DB, database string, table string) (columns []map[string]any, err error) {
 	rows, err := db.QueryContext(ctx, `SELECT COLUMN_NAME, DATA_TYPE, COLUMN_TYPE, IS_NULLABLE, COLUMN_DEFAULT, COLUMN_KEY, EXTRA, COLUMN_COMMENT FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION`, database, table)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	columns := []map[string]any{}
+	defer mergeCloseError(&err, rows.Close)
+	columns = []map[string]any{}
 	for rows.Next() {
 		var name, dataType, columnType, nullable, key, extra, comment string
 		var def sql.NullString
@@ -1404,12 +1404,12 @@ func loadMySQLColumns(ctx context.Context, db *sql.DB, database string, table st
 	return columns, rows.Err()
 }
 
-func loadMySQLIndexes(ctx context.Context, db *sql.DB, database string, table string) ([]map[string]any, error) {
+func loadMySQLIndexes(ctx context.Context, db *sql.DB, database string, table string) (indexes []map[string]any, err error) {
 	rows, err := db.QueryContext(ctx, `SELECT INDEX_NAME, NON_UNIQUE, COLUMN_NAME, SEQ_IN_INDEX FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY INDEX_NAME, SEQ_IN_INDEX`, database, table)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer mergeCloseError(&err, rows.Close)
 	grouped := map[string]map[string]any{}
 	order := []string{}
 	for rows.Next() {
@@ -1429,20 +1429,20 @@ func loadMySQLIndexes(ctx context.Context, db *sql.DB, database string, table st
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
-	indexes := make([]map[string]any, 0, len(order))
+	indexes = make([]map[string]any, 0, len(order))
 	for _, name := range order {
 		indexes = append(indexes, grouped[name])
 	}
 	return indexes, nil
 }
 
-func loadMySQLForeignKeys(ctx context.Context, db *sql.DB, database string, table string) ([]map[string]any, error) {
+func loadMySQLForeignKeys(ctx context.Context, db *sql.DB, database string, table string) (foreignKeys []map[string]any, err error) {
 	rows, err := db.QueryContext(ctx, `SELECT CONSTRAINT_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND REFERENCED_TABLE_NAME IS NOT NULL ORDER BY CONSTRAINT_NAME, ORDINAL_POSITION`, database, table)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	foreignKeys := []map[string]any{}
+	defer mergeCloseError(&err, rows.Close)
+	foreignKeys = []map[string]any{}
 	for rows.Next() {
 		var name, column, refTable, refColumn string
 		if err := rows.Scan(&name, &column, &refTable, &refColumn); err != nil {
@@ -1460,13 +1460,13 @@ func postgresTableType(tableType string) string {
 	return "table"
 }
 
-func loadPostgresColumns(ctx context.Context, db *sql.DB, schema string, table string) ([]map[string]any, error) {
+func loadPostgresColumns(ctx context.Context, db *sql.DB, schema string, table string) (columns []map[string]any, err error) {
 	rows, err := db.QueryContext(ctx, `SELECT column_name, data_type, is_nullable, column_default FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 ORDER BY ordinal_position`, schema, table)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	columns := []map[string]any{}
+	defer mergeCloseError(&err, rows.Close)
+	columns = []map[string]any{}
 	for rows.Next() {
 		var name, dataType, nullable string
 		var def sql.NullString
@@ -1482,13 +1482,13 @@ func loadPostgresColumns(ctx context.Context, db *sql.DB, schema string, table s
 	return columns, rows.Err()
 }
 
-func loadPostgresIndexes(ctx context.Context, db *sql.DB, schema string, table string) ([]map[string]any, error) {
+func loadPostgresIndexes(ctx context.Context, db *sql.DB, schema string, table string) (indexes []map[string]any, err error) {
 	rows, err := db.QueryContext(ctx, `SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = $1 AND tablename = $2 ORDER BY indexname`, schema, table)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	indexes := []map[string]any{}
+	defer mergeCloseError(&err, rows.Close)
+	indexes = []map[string]any{}
 	for rows.Next() {
 		var name, definition string
 		if err := rows.Scan(&name, &definition); err != nil {
@@ -1499,13 +1499,13 @@ func loadPostgresIndexes(ctx context.Context, db *sql.DB, schema string, table s
 	return indexes, rows.Err()
 }
 
-func loadPostgresForeignKeys(ctx context.Context, db *sql.DB, schema string, table string) ([]map[string]any, error) {
+func loadPostgresForeignKeys(ctx context.Context, db *sql.DB, schema string, table string) (foreignKeys []map[string]any, err error) {
 	rows, err := db.QueryContext(ctx, `SELECT tc.constraint_name, kcu.column_name, ccu.table_name AS foreign_table_name, ccu.column_name AS foreign_column_name FROM information_schema.table_constraints tc JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema JOIN information_schema.constraint_column_usage ccu ON ccu.constraint_name = tc.constraint_name AND ccu.table_schema = tc.table_schema WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = $1 AND tc.table_name = $2 ORDER BY tc.constraint_name, kcu.ordinal_position`, schema, table)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	foreignKeys := []map[string]any{}
+	defer mergeCloseError(&err, rows.Close)
+	foreignKeys = []map[string]any{}
 	for rows.Next() {
 		var name, column, refTable, refColumn string
 		if err := rows.Scan(&name, &column, &refTable, &refColumn); err != nil {
@@ -1516,13 +1516,13 @@ func loadPostgresForeignKeys(ctx context.Context, db *sql.DB, schema string, tab
 	return foreignKeys, rows.Err()
 }
 
-func loadSQLiteColumns(ctx context.Context, db *sql.DB, table string) ([]map[string]any, error) {
+func loadSQLiteColumns(ctx context.Context, db *sql.DB, table string) (columns []map[string]any, err error) {
 	rows, err := db.QueryContext(ctx, fmt.Sprintf("PRAGMA table_info(%s)", quoteSQLiteIdentifier(table)))
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	columns := []map[string]any{}
+	defer mergeCloseError(&err, rows.Close)
+	columns = []map[string]any{}
 	for rows.Next() {
 		var cid, notNull, pk int
 		var name, columnType string
@@ -1539,13 +1539,13 @@ func loadSQLiteColumns(ctx context.Context, db *sql.DB, table string) ([]map[str
 	return columns, rows.Err()
 }
 
-func loadSQLiteIndexes(ctx context.Context, db *sql.DB, table string) ([]map[string]any, error) {
+func loadSQLiteIndexes(ctx context.Context, db *sql.DB, table string) (indexes []map[string]any, err error) {
 	rows, err := db.QueryContext(ctx, fmt.Sprintf("PRAGMA index_list(%s)", quoteSQLiteIdentifier(table)))
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	indexes := []map[string]any{}
+	defer mergeCloseError(&err, rows.Close)
+	indexes = []map[string]any{}
 	for rows.Next() {
 		var seq, unique int
 		var name, origin string
@@ -1558,13 +1558,13 @@ func loadSQLiteIndexes(ctx context.Context, db *sql.DB, table string) ([]map[str
 	return indexes, rows.Err()
 }
 
-func loadSQLiteForeignKeys(ctx context.Context, db *sql.DB, table string) ([]map[string]any, error) {
+func loadSQLiteForeignKeys(ctx context.Context, db *sql.DB, table string) (foreignKeys []map[string]any, err error) {
 	rows, err := db.QueryContext(ctx, fmt.Sprintf("PRAGMA foreign_key_list(%s)", quoteSQLiteIdentifier(table)))
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	foreignKeys := []map[string]any{}
+	defer mergeCloseError(&err, rows.Close)
+	foreignKeys = []map[string]any{}
 	for rows.Next() {
 		var id, seq int
 		var refTable, column, refColumn, onUpdate, onDelete, match string
@@ -1664,7 +1664,7 @@ func tailLogEntries(path string, count int) []string {
 	return entries[len(entries)-count:]
 }
 
-func readTailLines(path string, count int) ([]string, error) {
+func readTailLines(path string, count int) (lines []string, err error) {
 	if count <= 0 {
 		return []string{}, nil
 	}
@@ -1672,7 +1672,7 @@ func readTailLines(path string, count int) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer mergeCloseError(&err, file.Close)
 	info, err := file.Stat()
 	if err != nil {
 		return nil, err
@@ -1687,7 +1687,7 @@ func readTailLines(path string, count int) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	lines := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
+	lines = strings.Split(strings.TrimRight(string(data), "\n"), "\n")
 	if len(lines) > 0 && int64(len(data)) < info.Size() {
 		// 尾部窗口可能从一行中间开始；丢弃首个不完整行，保证返回内容是完整日志行。
 		lines = lines[1:]

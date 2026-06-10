@@ -24,6 +24,22 @@ const maxToolOutputBytes = 1 << 20
 var executeToolSubprocess = defaultExecuteToolSubprocess
 var executablePath = os.Executable
 
+// writeLine writes CLI output and panics on writer failures because most CLI
+// print helpers do not have an error return channel.
+func writeLine(w io.Writer, args ...any) {
+	if _, err := fmt.Fprintln(w, args...); err != nil {
+		panic(err)
+	}
+}
+
+// writeFormat writes formatted CLI output and panics on writer failures because
+// callers already encode command success or failure as exit codes.
+func writeFormat(w io.Writer, format string, args ...any) {
+	if _, err := fmt.Fprintf(w, format, args...); err != nil {
+		panic(err)
+	}
+}
+
 // Run 执行 Prismgo Lens CLI。
 func Run(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) int {
 	if len(args) == 0 {
@@ -57,33 +73,33 @@ func Run(args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) int
 	case "add-skill":
 		return runAddSkill(project, rest[1:], stdout, stderr)
 	default:
-		fmt.Fprintf(stderr, "unknown command: %s\n", rest[0])
+		writeFormat(stderr, "unknown command: %s\n", rest[0])
 		printHelp(stderr)
 		return 2
 	}
 }
 
 func printHelp(w io.Writer) {
-	fmt.Fprintln(w, "Prismgo Lens development tooling")
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Usage:")
-	fmt.Fprintln(w, "  prismgolens [--project PATH] <command>")
-	fmt.Fprintln(w)
-	fmt.Fprintln(w, "Commands:")
-	fmt.Fprintln(w, "  install        install guidelines, skills, and MCP config")
-	fmt.Fprintln(w, "  update         resync previously installed Lens files")
-	fmt.Fprintln(w, "  doctor         check Prismgo Lens installation and Agent MCP config")
-	fmt.Fprintln(w, "  mcp            start stdio MCP JSON-RPC server")
-	fmt.Fprintln(w, "  execute-tool   execute a registered tool with base64 JSON args")
-	fmt.Fprintln(w, "  browser-proxy  start a dev-only reverse proxy that captures browser logs")
-	fmt.Fprintln(w, "  add-skill      audit and add a local skill directory")
-	fmt.Fprintln(w, "  list-skills    list local .ai skills")
+	writeLine(w, "Prismgo Lens development tooling")
+	writeLine(w)
+	writeLine(w, "Usage:")
+	writeLine(w, "  prismgolens [--project PATH] <command>")
+	writeLine(w)
+	writeLine(w, "Commands:")
+	writeLine(w, "  install        install guidelines, skills, and MCP config")
+	writeLine(w, "  update         resync previously installed Lens files")
+	writeLine(w, "  doctor         check Prismgo Lens installation and Agent MCP config")
+	writeLine(w, "  mcp            start stdio MCP JSON-RPC server")
+	writeLine(w, "  execute-tool   execute a registered tool with base64 JSON args")
+	writeLine(w, "  browser-proxy  start a dev-only reverse proxy that captures browser logs")
+	writeLine(w, "  add-skill      audit and add a local skill directory")
+	writeLine(w, "  list-skills    list local .ai skills")
 }
 
 func runInstall(project string, args []string, stdin io.Reader, stdout io.Writer, stderr io.Writer) int {
 	options, dryRun, interactive, err := parseInstallOptions(args)
 	if err != nil {
-		fmt.Fprintln(stderr, err)
+		writeLine(stderr, err)
 		return 2
 	}
 	if dryRun {
@@ -93,13 +109,13 @@ func runInstall(project string, args []string, stdin io.Reader, stdout io.Writer
 		var err error
 		options, err = promptInstallOptions(project, options, stdin, stdout)
 		if err != nil {
-			fmt.Fprintln(stderr, err)
+			writeLine(stderr, err)
 			return 1
 		}
 	}
 	result, err := lens.Install(project, options)
 	if err != nil {
-		fmt.Fprintln(stderr, err)
+		writeLine(stderr, err)
 		return 1
 	}
 	printInstallResult(stdout, result)
@@ -120,50 +136,50 @@ func runUpdate(project string, args []string, stdout io.Writer, stderr io.Writer
 			discover = true
 		case "--no-interaction":
 		default:
-			fmt.Fprintf(stderr, "unknown update option: %s\n", arg)
+			writeFormat(stderr, "unknown update option: %s\n", arg)
 			return 2
 		}
 	}
 	if dryRun {
 		root, err := lens.DetectProject(project)
 		if err != nil {
-			fmt.Fprintln(stderr, err)
+			writeLine(stderr, err)
 			return 1
 		}
 		config, err := lens.ReadConfig(root.Root)
 		if err != nil {
 			if !os.IsNotExist(err) {
-				fmt.Fprintln(stderr, err)
+				writeLine(stderr, err)
 				return 1
 			}
 			config, err = lens.DefaultProjectConfig(root.Root, lens.InstallOptions{Features: lens.DefaultFeatures()})
 			if err != nil {
-				fmt.Fprintln(stderr, err)
+				writeLine(stderr, err)
 				return 1
 			}
 		}
 		if err := lens.ValidateConfig(root.Root, config); err != nil {
-			fmt.Fprintln(stderr, err)
+			writeLine(stderr, err)
 			return 1
 		}
 		if ignoreSkills {
 			config.Features.Skills = false
 		}
-		fmt.Fprintln(stdout, "Dry run: true")
-		fmt.Fprintf(stdout, "Project: %s\n", root.Root)
+		writeLine(stdout, "Dry run: true")
+		writeFormat(stdout, "Project: %s\n", root.Root)
 		printAgents(stdout, config.Agents)
-		fmt.Fprintf(stdout, "Features: %s\n", featureList(config.Features))
-		fmt.Fprintf(stdout, "Enforce tests: %t\n", config.EnforceTests)
+		writeFormat(stdout, "Features: %s\n", featureList(config.Features))
+		writeFormat(stdout, "Enforce tests: %t\n", config.EnforceTests)
 		printInstallWritePlan(stdout, root.Root, lens.InstallOptions{Agents: config.Agents, Features: config.Features, SelectedPackageModules: config.SelectedPackageModules, EnforceTests: &config.EnforceTests})
 		if discover && !printDiscoveredPackageAssets(root.Root, stdout, stderr) {
 			return 1
 		}
-		fmt.Fprintln(stdout, "No files written.")
+		writeLine(stdout, "No files written.")
 		return 0
 	}
 	result, err := lens.UpdateWithOptions(project, lens.UpdateOptions{IgnoreSkills: ignoreSkills})
 	if err != nil {
-		fmt.Fprintln(stderr, err)
+		writeLine(stderr, err)
 		return 1
 	}
 	printInstallResult(stdout, result)
@@ -251,23 +267,23 @@ func promptInstallOptions(project string, options lens.InstallOptions, stdin io.
 			defaultAgents = append(defaultAgents, agent.Name)
 		}
 	}
-	fmt.Fprintln(stdout, "Prismgo Lens install wizard")
-	fmt.Fprintf(stdout, "Project: %s\n", root.Root)
-	fmt.Fprintln(stdout, "Dev-only: Prismgo Lens writes Agent and MCP files but is not imported by production builds.")
+	writeLine(stdout, "Prismgo Lens install wizard")
+	writeFormat(stdout, "Project: %s\n", root.Root)
+	writeLine(stdout, "Dev-only: Prismgo Lens writes Agent and MCP files but is not imported by production builds.")
 	if len(detected) == 0 {
-		fmt.Fprintln(stdout, "Detected agents: none")
+		writeLine(stdout, "Detected agents: none")
 	} else {
-		fmt.Fprintf(stdout, "Detected agents: %s\n", strings.Join(agentNamesFromDetected(detected), ", "))
+		writeFormat(stdout, "Detected agents: %s\n", strings.Join(agentNamesFromDetected(detected), ", "))
 	}
 	assets, assetErr := lens.DiscoverPackageAssets(root.Root)
 	if assetErr != nil {
-		fmt.Fprintf(stdout, "Detected package assets: unavailable (%s)\n", assetErr)
+		writeFormat(stdout, "Detected package assets: unavailable (%s)\n", assetErr)
 	} else if len(assets) == 0 {
-		fmt.Fprintln(stdout, "Detected package assets: none")
+		writeLine(stdout, "Detected package assets: none")
 	} else {
-		fmt.Fprintln(stdout, "Detected package assets:")
+		writeLine(stdout, "Detected package assets:")
 		for _, asset := range assets {
-			fmt.Fprintf(stdout, "  - %s %s %s\n", asset.Module, asset.Type, asset.Name)
+			writeFormat(stdout, "  - %s %s %s\n", asset.Module, asset.Type, asset.Name)
 		}
 	}
 	reader := bufio.NewReader(stdin)
@@ -288,7 +304,7 @@ func promptInstallOptions(project string, options lens.InstallOptions, stdin io.
 		moduleDefaults = []string{}
 	}
 	options.SelectedPackageModules = promptCSV(reader, stdout, "Selected package modules (default none)", moduleDefaults)
-	fmt.Fprintf(stdout, "Will write features: %s\n", featureList(options.Features))
+	writeFormat(stdout, "Will write features: %s\n", featureList(options.Features))
 	printInstallWritePlan(stdout, root.Root, options)
 	return options, nil
 }
@@ -298,7 +314,7 @@ func promptCSV(reader *bufio.Reader, stdout io.Writer, label string, defaults []
 	if defaultText == "" {
 		defaultText = "none"
 	}
-	fmt.Fprintf(stdout, "%s [%s]: ", label, defaultText)
+	writeFormat(stdout, "%s [%s]: ", label, defaultText)
 	line, _ := reader.ReadString('\n')
 	line = strings.TrimSpace(line)
 	if line == "" {
@@ -321,7 +337,7 @@ func promptBool(reader *bufio.Reader, stdout io.Writer, label string, fallback b
 	if fallback {
 		suffix = "Y/n"
 	}
-	fmt.Fprintf(stdout, "%s [%s]: ", label, suffix)
+	writeFormat(stdout, "%s [%s]: ", label, suffix)
 	line, _ := reader.ReadString('\n')
 	line = strings.ToLower(strings.TrimSpace(line))
 	if line == "" {
@@ -353,7 +369,7 @@ func isInteractiveInput(stdin io.Reader) bool {
 func printInstallDryRun(project string, options lens.InstallOptions, stdout io.Writer, stderr io.Writer) int {
 	root, err := lens.DetectProject(project)
 	if err != nil {
-		fmt.Fprintln(stderr, err)
+		writeLine(stderr, err)
 		return 1
 	}
 	agents := options.Agents
@@ -362,86 +378,86 @@ func printInstallDryRun(project string, options lens.InstallOptions, stdout io.W
 			agents = append(agents, agent.Name)
 		}
 	}
-	fmt.Fprintln(stdout, "Dry run: true")
-	fmt.Fprintf(stdout, "Project: %s\n", root.Root)
+	writeLine(stdout, "Dry run: true")
+	writeFormat(stdout, "Project: %s\n", root.Root)
 	if len(agents) == 0 {
-		fmt.Fprintln(stdout, "Agents: none")
+		writeLine(stdout, "Agents: none")
 	} else {
 		printAgents(stdout, agents)
 	}
-	fmt.Fprintf(stdout, "Features: %s\n", featureList(options.Features))
+	writeFormat(stdout, "Features: %s\n", featureList(options.Features))
 	if options.NoFixPath {
-		fmt.Fprintln(stdout, "PATH fix: disabled")
+		writeLine(stdout, "PATH fix: disabled")
 	} else {
-		fmt.Fprintln(stdout, "PATH fix: enabled")
+		writeLine(stdout, "PATH fix: enabled")
 	}
 	if options.MCPCommandMode != "" {
-		fmt.Fprintf(stdout, "MCP command mode: %s\n", options.MCPCommandMode)
+		writeFormat(stdout, "MCP command mode: %s\n", options.MCPCommandMode)
 	}
 	if options.EnforceTests != nil {
-		fmt.Fprintf(stdout, "Enforce tests: %t\n", *options.EnforceTests)
+		writeFormat(stdout, "Enforce tests: %t\n", *options.EnforceTests)
 	}
 	printInstallWritePlan(stdout, root.Root, lens.InstallOptions{Agents: agents, Features: options.Features, SelectedPackageModules: options.SelectedPackageModules, EnforceTests: options.EnforceTests})
 	if options.Features.MCP {
 		printMCPInstallPlans(stdout, lens.AgentMCPInstallPlans(agents))
 	}
 	if len(options.SelectedPackageModules) > 0 {
-		fmt.Fprintf(stdout, "Selected package modules: %s\n", strings.Join(options.SelectedPackageModules, ", "))
+		writeFormat(stdout, "Selected package modules: %s\n", strings.Join(options.SelectedPackageModules, ", "))
 	}
-	fmt.Fprintln(stdout, "Dev-only: Prismgo Lens is an independent tool module and is not imported by production builds.")
-	fmt.Fprintln(stdout, "No files written.")
+	writeLine(stdout, "Dev-only: Prismgo Lens is an independent tool module and is not imported by production builds.")
+	writeLine(stdout, "No files written.")
 	return 0
 }
 
 func runDoctor(project string, stdout io.Writer, stderr io.Writer) int {
 	report, err := lens.Doctor(project)
 	if err != nil {
-		fmt.Fprintln(stderr, err)
+		writeLine(stderr, err)
 		return 1
 	}
-	fmt.Fprintf(stdout, "Project: %s\n", report.ProjectRoot)
-	fmt.Fprintf(stdout, "Command: %s\n", report.Command)
-	fmt.Fprintf(stdout, "PATH: %s\n", report.PathStatus)
+	writeFormat(stdout, "Project: %s\n", report.ProjectRoot)
+	writeFormat(stdout, "Command: %s\n", report.Command)
+	writeFormat(stdout, "PATH: %s\n", report.PathStatus)
 	for _, warning := range report.Warnings {
-		fmt.Fprintf(stdout, "Warning: %s\n", warning)
+		writeFormat(stdout, "Warning: %s\n", warning)
 	}
 	return 0
 }
 
 func printAgents(stdout io.Writer, agents []string) {
 	if len(agents) == 0 {
-		fmt.Fprintln(stdout, "Agents: none")
+		writeLine(stdout, "Agents: none")
 		return
 	}
-	fmt.Fprintf(stdout, "Agents: %s\n", strings.Join(agents, ", "))
+	writeFormat(stdout, "Agents: %s\n", strings.Join(agents, ", "))
 }
 
 func printInstallWritePlan(stdout io.Writer, root string, options lens.InstallOptions) {
-	fmt.Fprintln(stdout, "Will write:")
-	fmt.Fprintln(stdout, "  - .prismgo-lens.json")
-	fmt.Fprintln(stdout, "  - .prismgo-lens.local.json")
+	writeLine(stdout, "Will write:")
+	writeLine(stdout, "  - .prismgo-lens.json")
+	writeLine(stdout, "  - .prismgo-lens.local.json")
 	if options.Features.Guidelines {
-		fmt.Fprintln(stdout, "  - .ai guidelines")
+		writeLine(stdout, "  - .ai guidelines")
 	}
 	if options.Features.Skills {
-		fmt.Fprintln(stdout, "  - .ai/skills and selected Agent skills directories")
+		writeLine(stdout, "  - .ai/skills and selected Agent skills directories")
 	}
 	if options.Features.MCP {
-		fmt.Fprintln(stdout, "  - Agent MCP config")
+		writeLine(stdout, "  - Agent MCP config")
 	}
 	if len(options.SelectedPackageModules) > 0 {
-		fmt.Fprintf(stdout, "  - package asset targets for %s\n", strings.Join(options.SelectedPackageModules, ", "))
+		writeFormat(stdout, "  - package asset targets for %s\n", strings.Join(options.SelectedPackageModules, ", "))
 	}
-	fmt.Fprintf(stdout, "Merge behavior: managed Prismgo Lens blocks are replaced; existing project .ai files at the same path override built-ins under %s.\n", root)
+	writeFormat(stdout, "Merge behavior: managed Prismgo Lens blocks are replaced; existing project .ai files at the same path override built-ins under %s.\n", root)
 }
 
 func printMCPInstallPlans(stdout io.Writer, plans []lens.AgentMCPInstallPlan) {
 	if len(plans) == 0 {
 		return
 	}
-	fmt.Fprintln(stdout, "MCP install plans:")
+	writeLine(stdout, "MCP install plans:")
 	for _, plan := range plans {
-		fmt.Fprintf(stdout, "  - %s: strategy=%s config=%s command=%s %s\n", plan.Agent, plan.Strategy, plan.ConfigPath, plan.Command, strings.Join(plan.Args, " "))
+		writeFormat(stdout, "  - %s: strategy=%s config=%s command=%s %s\n", plan.Agent, plan.Strategy, plan.ConfigPath, plan.Command, strings.Join(plan.Args, " "))
 	}
 }
 
@@ -469,46 +485,46 @@ func featureList(features lens.Features) string {
 }
 
 func printInstallResult(w io.Writer, result lens.InstallResult) {
-	fmt.Fprintf(w, "Project: %s\n", result.ProjectRoot)
+	writeFormat(w, "Project: %s\n", result.ProjectRoot)
 	if len(result.Detected) == 0 {
-		fmt.Fprintln(w, "Agents: none detected; rerun install after creating an Agent config")
+		writeLine(w, "Agents: none detected; rerun install after creating an Agent config")
 	} else {
 		names := make([]string, 0, len(result.Detected))
 		for _, agent := range result.Detected {
 			names = append(names, agent.Name)
 		}
-		fmt.Fprintf(w, "Agents: %s\n", strings.Join(names, ", "))
+		writeFormat(w, "Agents: %s\n", strings.Join(names, ", "))
 	}
-	fmt.Fprintln(w, "Dev-only: Prismgo Lens is an independent tool module and is not imported by production builds.")
-	fmt.Fprintln(w, "Shared config: .prismgo-lens.json")
-	fmt.Fprintln(w, "Local config: .prismgo-lens.local.json")
-	fmt.Fprintln(w, "Written:")
+	writeLine(w, "Dev-only: Prismgo Lens is an independent tool module and is not imported by production builds.")
+	writeLine(w, "Shared config: .prismgo-lens.json")
+	writeLine(w, "Local config: .prismgo-lens.local.json")
+	writeLine(w, "Written:")
 	for _, file := range result.WrittenFiles {
-		fmt.Fprintf(w, "  - %s\n", file)
+		writeFormat(w, "  - %s\n", file)
 	}
 }
 
 func printDiscoveredPackageAssets(root string, stdout io.Writer, stderr io.Writer) bool {
 	assets, err := lens.DiscoverPackageAssets(root)
 	if err != nil {
-		fmt.Fprintln(stderr, err)
+		writeLine(stderr, err)
 		return false
 	}
 	if len(assets) == 0 {
-		fmt.Fprintln(stdout, "Discovered package assets: none")
+		writeLine(stdout, "Discovered package assets: none")
 		return true
 	}
-	fmt.Fprintln(stdout, "Discovered package assets:")
+	writeLine(stdout, "Discovered package assets:")
 	for _, asset := range assets {
-		fmt.Fprintf(stdout, "  - %s %s %s %s\n", asset.Module, asset.Type, asset.Name, asset.Path)
+		writeFormat(stdout, "  - %s %s %s %s\n", asset.Module, asset.Type, asset.Name, asset.Path)
 	}
-	fmt.Fprintln(stdout, "Package assets are listed only; enable or install them explicitly after review.")
+	writeLine(stdout, "Package assets are listed only; enable or install them explicitly after review.")
 	return true
 }
 
 func runExecuteTool(project string, args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) < 1 {
-		fmt.Fprintln(stderr, "execute-tool requires a tool name")
+		writeLine(stderr, "execute-tool requires a tool name")
 		return 2
 	}
 	encoded := ""
@@ -517,38 +533,38 @@ func runExecuteTool(project string, args []string, stdout io.Writer, stderr io.W
 	}
 	decoded, err := lens.DecodeToolArguments(encoded)
 	if err != nil {
-		fmt.Fprintln(stderr, err)
+		writeLine(stderr, err)
 		return 1
 	}
 	data, err := lens.ExecuteTool(project, args[0], decoded)
 	if err != nil {
-		fmt.Fprintln(stderr, err)
+		writeLine(stderr, err)
 		return 1
 	}
-	fmt.Fprintln(stdout, string(data))
+	writeLine(stdout, string(data))
 	return 0
 }
 
 func runListSkills(project string, stdout io.Writer, stderr io.Writer) int {
 	root, err := lens.DetectProject(project)
 	if err != nil {
-		fmt.Fprintln(stderr, err)
+		writeLine(stderr, err)
 		return 1
 	}
 	skills, err := lens.ListSkills(root.Root)
 	if err != nil {
-		fmt.Fprintln(stderr, err)
+		writeLine(stderr, err)
 		return 1
 	}
 	for _, skill := range skills {
-		fmt.Fprintln(stdout, skill)
+		writeLine(stdout, skill)
 	}
 	return 0
 }
 
 func runAddSkill(project string, args []string, stdout io.Writer, stderr io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(stderr, "add-skill requires a local directory or GitHub source")
+		writeLine(stderr, "add-skill requires a local directory or GitHub source")
 		return 2
 	}
 	options := lens.AddSkillOptions{}
@@ -565,47 +581,47 @@ func runAddSkill(project string, args []string, stdout io.Writer, stderr io.Writ
 			options.SkipAudit = true
 		case "--skill":
 			if i+1 >= len(args) {
-				fmt.Fprintln(stderr, "--skill requires a name")
+				writeLine(stderr, "--skill requires a name")
 				return 2
 			}
 			options.Skill = args[i+1]
 			i++
 		default:
 			if strings.HasPrefix(args[i], "--") {
-				fmt.Fprintf(stderr, "unknown add-skill option: %s\n", args[i])
+				writeFormat(stderr, "unknown add-skill option: %s\n", args[i])
 				return 2
 			}
 			source = args[i]
 		}
 	}
 	if source == "" {
-		fmt.Fprintln(stderr, "add-skill requires a source")
+		writeLine(stderr, "add-skill requires a source")
 		return 2
 	}
 	root, err := lens.DetectProject(project)
 	if err != nil {
-		fmt.Fprintln(stderr, err)
+		writeLine(stderr, err)
 		return 1
 	}
 	reports, candidates, err := lens.AddSkill(root.Root, source, options)
 	if err != nil {
 		if len(candidates) > 0 {
-			fmt.Fprintln(stderr, "candidate skills:")
+			writeLine(stderr, "candidate skills:")
 			for _, candidate := range candidates {
-				fmt.Fprintf(stderr, "  - %s\n", candidate)
+				writeFormat(stderr, "  - %s\n", candidate)
 			}
 		}
-		fmt.Fprintln(stderr, err)
+		writeLine(stderr, err)
 		return 1
 	}
 	if options.ListOnly {
 		for _, candidate := range candidates {
-			fmt.Fprintln(stdout, candidate)
+			writeLine(stdout, candidate)
 		}
 		return 0
 	}
 	data, _ := json.MarshalIndent(map[string]any{"installed": candidates, "reports": reports}, "", "  ")
-	fmt.Fprintln(stdout, string(data))
+	writeLine(stdout, string(data))
 	return 0
 }
 
@@ -616,40 +632,40 @@ func runBrowserProxy(project string, args []string, stdout io.Writer, stderr io.
 		switch args[i] {
 		case "--target":
 			if i+1 >= len(args) {
-				fmt.Fprintln(stderr, "--target requires a URL")
+				writeLine(stderr, "--target requires a URL")
 				return 2
 			}
 			target = args[i+1]
 			i++
 		case "--listen":
 			if i+1 >= len(args) {
-				fmt.Fprintln(stderr, "--listen requires an address")
+				writeLine(stderr, "--listen requires an address")
 				return 2
 			}
 			listen = args[i+1]
 			i++
 		default:
-			fmt.Fprintf(stderr, "unknown browser-proxy option: %s\n", args[i])
+			writeFormat(stderr, "unknown browser-proxy option: %s\n", args[i])
 			return 2
 		}
 	}
 	if target == "" {
-		fmt.Fprintln(stderr, "browser-proxy requires --target")
+		writeLine(stderr, "browser-proxy requires --target")
 		return 2
 	}
 	root, err := lens.DetectProject(project)
 	if err != nil {
-		fmt.Fprintln(stderr, err)
+		writeLine(stderr, err)
 		return 1
 	}
 	handler, err := newBrowserProxyHandler(root.Root, target)
 	if err != nil {
-		fmt.Fprintln(stderr, err)
+		writeLine(stderr, err)
 		return 2
 	}
-	fmt.Fprintf(stdout, "Prismgo Lens browser proxy listening on http://%s -> %s\n", listen, target)
+	writeFormat(stdout, "Prismgo Lens browser proxy listening on http://%s -> %s\n", listen, target)
 	if err := http.ListenAndServe(listen, handler); err != nil {
-		fmt.Fprintln(stderr, err)
+		writeLine(stderr, err)
 		return 1
 	}
 	return 0
@@ -673,11 +689,11 @@ func newBrowserProxyHandler(root string, target string) (http.Handler, error) {
 	if parsed.Scheme == "" || parsed.Host == "" {
 		return nil, errors.New("browser-proxy target must include scheme and host")
 	}
-	proxy := httputil.NewSingleHostReverseProxy(parsed)
-	originalDirector := proxy.Director
-	proxy.Director = func(request *http.Request) {
-		originalDirector(request)
-		request.Host = parsed.Host
+	proxy := &httputil.ReverseProxy{
+		Rewrite: func(request *httputil.ProxyRequest) {
+			request.SetURL(parsed)
+			request.Out.Host = parsed.Host
+		},
 	}
 	proxy.ModifyResponse = func(response *http.Response) error {
 		if !shouldInjectBrowserLogger(response) {
@@ -708,10 +724,7 @@ func shouldInjectBrowserLogger(response *http.Response) bool {
 		return false
 	}
 	contentType := strings.ToLower(response.Header.Get("Content-Type"))
-	if !strings.Contains(contentType, "text/html") {
-		return false
-	}
-	return true
+	return strings.Contains(contentType, "text/html")
 }
 
 type rpcRequest struct {
@@ -742,7 +755,7 @@ func runMCP(project string, stdin io.Reader, stdout io.Writer, stderr io.Writer)
 		}
 	}
 	if err := scanner.Err(); err != nil {
-		fmt.Fprintln(stderr, err)
+		writeLine(stderr, err)
 		return 1
 	}
 	return 0
@@ -920,6 +933,9 @@ func defaultExecuteToolSubprocess(ctx context.Context, project string, name stri
 }
 
 func writeRPC(w io.Writer, response rpcResponse) {
-	data, _ := json.Marshal(response)
-	fmt.Fprintln(w, string(data))
+	data, err := json.Marshal(response)
+	if err != nil {
+		panic(err)
+	}
+	writeLine(w, string(data))
 }

@@ -43,7 +43,7 @@ func InjectBrowserLogger(status int, header http.Header, body []byte) []byte {
 }
 
 // WriteBrowserLog 把浏览器日志写入 storage/logs/browser.log。
-func WriteBrowserLog(root string, line []byte) error {
+func WriteBrowserLog(root string, line []byte) (err error) {
 	target := filepath.Join(root, "storage", "logs", "browser.log")
 	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
 		return err
@@ -52,7 +52,7 @@ func WriteBrowserLog(root string, line []byte) error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer mergeCloseError(&err, file.Close)
 	_, err = file.Write(append(formatBrowserLogLine(line), '\n'))
 	return err
 }

@@ -3,6 +3,7 @@ package lens
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -142,10 +143,15 @@ func databaseConnectionPingDiagnostic(root string, input json.RawMessage) (any, 
 	if err != nil {
 		return map[string]any{"ok": false, "error": err.Error()}, nil
 	}
-	defer db.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	if err := db.PingContext(ctx); err != nil {
+		if closeErr := db.Close(); closeErr != nil {
+			return map[string]any{"ok": false, "database": database, "error": errors.Join(err, closeErr).Error()}, nil
+		}
+		return map[string]any{"ok": false, "database": database, "error": err.Error()}, nil
+	}
+	if err := db.Close(); err != nil {
 		return map[string]any{"ok": false, "database": database, "error": err.Error()}, nil
 	}
 	return map[string]any{"ok": true, "database": database}, nil

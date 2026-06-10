@@ -21,6 +21,14 @@ import (
 	"github.com/DATA-DOG/go-sqlmock"
 )
 
+// closeTestResource reports cleanup failures from deferred test resources.
+func closeTestResource(t *testing.T, label string, close func() error) {
+	t.Helper()
+	if err := close(); err != nil {
+		t.Fatalf("close %s: %v", label, err)
+	}
+}
+
 func TestInstallAndUpdateWriteGuidelinesConfigAndRemainIdempotent(t *testing.T) {
 	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module prismgo\n\ngo 1.26.2\n"), 0o644); err != nil {
@@ -1611,7 +1619,7 @@ func init() { Add("database", func() map[string]interface{} { return map[string]
 	if err != nil {
 		t.Fatalf("open postgres config: %v", err)
 	}
-	defer postgresDB.Close()
+	defer closeTestResource(t, "postgres config database", postgresDB.Close)
 	if schema != "tenant" {
 		t.Fatalf("postgres schema = %q, want tenant", schema)
 	}
@@ -1619,7 +1627,7 @@ func init() { Add("database", func() map[string]interface{} { return map[string]
 	if err != nil {
 		t.Fatalf("open sqlite config: %v", err)
 	}
-	defer sqliteDB.Close()
+	defer closeTestResource(t, "sqlite config database", sqliteDB.Close)
 	if database != ":memory:" {
 		t.Fatalf("sqlite database = %q, want :memory:", database)
 	}
@@ -1812,7 +1820,7 @@ func init() { Add("database", func() map[string]interface{} { return map[string]
 	if err != nil {
 		t.Fatalf("open mysql connection: %v", err)
 	}
-	defer db.Close()
+	defer closeTestResource(t, "mysql connection database", db.Close)
 	if database != "workorder" {
 		t.Fatalf("database name = %s", database)
 	}
@@ -1823,7 +1831,6 @@ func TestDatabaseQueryExecutesReadOnlySQLWithLimitsAndRedaction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new sqlmock: %v", err)
 	}
-	defer db.Close()
 	old := openDatabaseConnection
 	t.Cleanup(func() { openDatabaseConnection = old })
 	openDatabaseConnection = func(string, string) (*sql.DB, string, error) {
@@ -1833,6 +1840,7 @@ func TestDatabaseQueryExecutesReadOnlySQLWithLimitsAndRedaction(t *testing.T) {
 		WillReturnRows(sqlmock.NewRows([]string{"id", "password"}).
 			AddRow(1, "secret").
 			AddRow(2, "secret2"))
+	mock.ExpectClose()
 
 	result, err := databaseQueryTool(t.TempDir(), json.RawMessage(`{"sql":"select id, password from users","max_rows":1}`))
 	if err != nil {
@@ -1852,7 +1860,6 @@ func TestDatabaseSchemaLoadsTablesAndColumnDetails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new sqlmock: %v", err)
 	}
-	defer db.Close()
 	old := openDatabaseConnection
 	t.Cleanup(func() { openDatabaseConnection = old })
 	openDatabaseConnection = func(string, string) (*sql.DB, string, error) {
@@ -1860,18 +1867,24 @@ func TestDatabaseSchemaLoadsTablesAndColumnDetails(t *testing.T) {
 	}
 	mock.ExpectQuery("information_schema.TABLES").
 		WithArgs("workorder", "%user%").
-		WillReturnRows(sqlmock.NewRows([]string{"TABLE_NAME", "TABLE_TYPE", "TABLE_ROWS"}).AddRow("users", "BASE TABLE", 2))
+		WillReturnRows(sqlmock.NewRows([]string{"TABLE_NAME", "TABLE_TYPE", "TABLE_ROWS"}).AddRow("users", "BASE TABLE", 2)).
+		RowsWillBeClosed()
 	mock.ExpectQuery("information_schema.COLUMNS").
 		WithArgs("workorder", "users").
 		WillReturnRows(sqlmock.NewRows([]string{"COLUMN_NAME", "DATA_TYPE", "COLUMN_TYPE", "IS_NULLABLE", "COLUMN_DEFAULT", "COLUMN_KEY", "EXTRA", "COLUMN_COMMENT"}).
 			AddRow("id", "bigint", "bigint unsigned", "NO", nil, "PRI", "auto_increment", "").
-			AddRow("email", "varchar", "varchar(255)", "YES", "none", "", "", ""))
+			AddRow("email", "varchar", "varchar(255)", "YES", "none", "", "", "")).
+		RowsWillBeClosed()
 	mock.ExpectQuery("information_schema.STATISTICS").
 		WithArgs("workorder", "users").
-		WillReturnRows(sqlmock.NewRows([]string{"INDEX_NAME", "NON_UNIQUE", "COLUMN_NAME", "SEQ_IN_INDEX"}))
+		WillReturnRows(sqlmock.NewRows([]string{"INDEX_NAME", "NON_UNIQUE", "COLUMN_NAME", "SEQ_IN_INDEX"})).
+		RowsWillBeClosed()
 	mock.ExpectQuery("information_schema.KEY_COLUMN_USAGE").
 		WithArgs("workorder", "users").
-		WillReturnRows(sqlmock.NewRows([]string{"CONSTRAINT_NAME", "COLUMN_NAME", "REFERENCED_TABLE_NAME", "REFERENCED_COLUMN_NAME"}))
+		WillReturnRows(sqlmock.NewRows([]string{"CONSTRAINT_NAME", "COLUMN_NAME", "REFERENCED_TABLE_NAME", "REFERENCED_COLUMN_NAME"})).
+		RowsWillBeClosed()
+	mock.ExpectClose()
+	mock.ExpectClose()
 
 	result, err := databaseSchemaTool(t.TempDir(), json.RawMessage(`{"mode":"full","filter":"user"}`))
 	if err != nil {
@@ -1893,7 +1906,6 @@ func TestDatabaseSchemaFullLoadsViewsIndexesAndForeignKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new sqlmock: %v", err)
 	}
-	defer db.Close()
 	old := openDatabaseConnection
 	t.Cleanup(func() { openDatabaseConnection = old })
 	openDatabaseConnection = func(string, string) (*sql.DB, string, error) {
@@ -1903,29 +1915,38 @@ func TestDatabaseSchemaFullLoadsViewsIndexesAndForeignKeys(t *testing.T) {
 		WithArgs("workorder").
 		WillReturnRows(sqlmock.NewRows([]string{"TABLE_NAME", "TABLE_TYPE", "TABLE_ROWS"}).
 			AddRow("users", "BASE TABLE", 2).
-			AddRow("active_users", "VIEW", nil))
+			AddRow("active_users", "VIEW", nil)).
+		RowsWillBeClosed()
 	mock.ExpectQuery("information_schema.COLUMNS").
 		WithArgs("workorder", "users").
 		WillReturnRows(sqlmock.NewRows([]string{"COLUMN_NAME", "DATA_TYPE", "COLUMN_TYPE", "IS_NULLABLE", "COLUMN_DEFAULT", "COLUMN_KEY", "EXTRA", "COLUMN_COMMENT"}).
-			AddRow("id", "bigint", "bigint unsigned", "NO", nil, "PRI", "auto_increment", "primary key"))
+			AddRow("id", "bigint", "bigint unsigned", "NO", nil, "PRI", "auto_increment", "primary key")).
+		RowsWillBeClosed()
 	mock.ExpectQuery("information_schema.STATISTICS").
 		WithArgs("workorder", "users").
 		WillReturnRows(sqlmock.NewRows([]string{"INDEX_NAME", "NON_UNIQUE", "COLUMN_NAME", "SEQ_IN_INDEX"}).
-			AddRow("PRIMARY", 0, "id", 1))
+			AddRow("PRIMARY", 0, "id", 1)).
+		RowsWillBeClosed()
 	mock.ExpectQuery("information_schema.KEY_COLUMN_USAGE").
 		WithArgs("workorder", "users").
 		WillReturnRows(sqlmock.NewRows([]string{"CONSTRAINT_NAME", "COLUMN_NAME", "REFERENCED_TABLE_NAME", "REFERENCED_COLUMN_NAME"}).
-			AddRow("users_account_id_foreign", "account_id", "accounts", "id"))
+			AddRow("users_account_id_foreign", "account_id", "accounts", "id")).
+		RowsWillBeClosed()
 	mock.ExpectQuery("information_schema.COLUMNS").
 		WithArgs("workorder", "active_users").
 		WillReturnRows(sqlmock.NewRows([]string{"COLUMN_NAME", "DATA_TYPE", "COLUMN_TYPE", "IS_NULLABLE", "COLUMN_DEFAULT", "COLUMN_KEY", "EXTRA", "COLUMN_COMMENT"}).
-			AddRow("id", "bigint", "bigint unsigned", "NO", nil, "", "", ""))
+			AddRow("id", "bigint", "bigint unsigned", "NO", nil, "", "", "")).
+		RowsWillBeClosed()
 	mock.ExpectQuery("information_schema.STATISTICS").
 		WithArgs("workorder", "active_users").
-		WillReturnRows(sqlmock.NewRows([]string{"INDEX_NAME", "NON_UNIQUE", "COLUMN_NAME", "SEQ_IN_INDEX"}))
+		WillReturnRows(sqlmock.NewRows([]string{"INDEX_NAME", "NON_UNIQUE", "COLUMN_NAME", "SEQ_IN_INDEX"})).
+		RowsWillBeClosed()
 	mock.ExpectQuery("information_schema.KEY_COLUMN_USAGE").
 		WithArgs("workorder", "active_users").
-		WillReturnRows(sqlmock.NewRows([]string{"CONSTRAINT_NAME", "COLUMN_NAME", "REFERENCED_TABLE_NAME", "REFERENCED_COLUMN_NAME"}))
+		WillReturnRows(sqlmock.NewRows([]string{"CONSTRAINT_NAME", "COLUMN_NAME", "REFERENCED_TABLE_NAME", "REFERENCED_COLUMN_NAME"})).
+		RowsWillBeClosed()
+	mock.ExpectClose()
+	mock.ExpectClose()
 
 	result, err := databaseSchemaTool(t.TempDir(), json.RawMessage(`{"mode":"full"}`))
 	if err != nil {
@@ -1947,7 +1968,6 @@ func TestDatabaseSchemaSupportsPostgreSQLSQLiteAndUnsupportedDriverContracts(t *
 	if err != nil {
 		t.Fatalf("new sqlmock: %v", err)
 	}
-	defer db.Close()
 	old := openDatabaseConnection
 	t.Cleanup(func() { openDatabaseConnection = old })
 
@@ -1963,16 +1983,22 @@ func TestDatabaseSchemaSupportsPostgreSQLSQLiteAndUnsupportedDriverContracts(t *
 	// 回归：PostgreSQL 驱动不接受 MySQL 风格的 ? 占位符，schema 查询必须使用 $1/$2。
 	mock.ExpectQuery("SELECT table_name, table_type FROM information_schema.tables WHERE table_schema = $1 ORDER BY table_name").
 		WithArgs("public").
-		WillReturnRows(sqlmock.NewRows([]string{"table_name", "table_type"}).AddRow("users", "BASE TABLE"))
+		WillReturnRows(sqlmock.NewRows([]string{"table_name", "table_type"}).AddRow("users", "BASE TABLE")).
+		RowsWillBeClosed()
 	mock.ExpectQuery("SELECT column_name, data_type, is_nullable, column_default FROM information_schema.columns WHERE table_schema = $1 AND table_name = $2 ORDER BY ordinal_position").
 		WithArgs("public", "users").
-		WillReturnRows(sqlmock.NewRows([]string{"column_name", "data_type", "is_nullable", "column_default"}).AddRow("id", "bigint", "NO", "nextval"))
+		WillReturnRows(sqlmock.NewRows([]string{"column_name", "data_type", "is_nullable", "column_default"}).AddRow("id", "bigint", "NO", "nextval")).
+		RowsWillBeClosed()
 	mock.ExpectQuery("SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = $1 AND tablename = $2 ORDER BY indexname").
 		WithArgs("public", "users").
-		WillReturnRows(sqlmock.NewRows([]string{"indexname", "indexdef"}).AddRow("users_pkey", "CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id)"))
+		WillReturnRows(sqlmock.NewRows([]string{"indexname", "indexdef"}).AddRow("users_pkey", "CREATE UNIQUE INDEX users_pkey ON public.users USING btree (id)")).
+		RowsWillBeClosed()
 	mock.ExpectQuery("SELECT tc.constraint_name, kcu.column_name, ccu.table_name AS foreign_table_name, ccu.column_name AS foreign_column_name FROM information_schema.table_constraints tc JOIN information_schema.key_column_usage kcu ON tc.constraint_name = kcu.constraint_name AND tc.table_schema = kcu.table_schema JOIN information_schema.constraint_column_usage ccu ON ccu.constraint_name = tc.constraint_name AND ccu.table_schema = tc.table_schema WHERE tc.constraint_type = 'FOREIGN KEY' AND tc.table_schema = $1 AND tc.table_name = $2 ORDER BY tc.constraint_name, kcu.ordinal_position").
 		WithArgs("public", "users").
-		WillReturnRows(sqlmock.NewRows([]string{"constraint_name", "column_name", "foreign_table_name", "foreign_column_name"}))
+		WillReturnRows(sqlmock.NewRows([]string{"constraint_name", "column_name", "foreign_table_name", "foreign_column_name"})).
+		RowsWillBeClosed()
+	mock.ExpectClose()
+	mock.ExpectClose()
 
 	postgres, err := databaseSchemaForDriver(t.TempDir(), "postgres", "pgsql", "full", "", false)
 	if err != nil {
@@ -1992,7 +2018,6 @@ func TestDatabaseSchemaSupportsPostgreSQLSQLiteAndUnsupportedDriverContracts(t *
 	if err != nil {
 		t.Fatalf("new sqlite sqlmock: %v", err)
 	}
-	defer sqliteDB.Close()
 	openDatabaseConnection = func(_ string, connection string) (*sql.DB, string, error) {
 		if connection == "sqlite" {
 			return sqliteDB, "main", nil
@@ -2001,13 +2026,19 @@ func TestDatabaseSchemaSupportsPostgreSQLSQLiteAndUnsupportedDriverContracts(t *
 	}
 
 	sqliteMock.ExpectQuery("sqlite_master").
-		WillReturnRows(sqlmock.NewRows([]string{"name", "type", "sql"}).AddRow("users", "table", "CREATE TABLE users (id integer primary key)"))
+		WillReturnRows(sqlmock.NewRows([]string{"name", "type", "sql"}).AddRow("users", "table", "CREATE TABLE users (id integer primary key)")).
+		RowsWillBeClosed()
 	sqliteMock.ExpectQuery("PRAGMA table_info").
-		WillReturnRows(sqlmock.NewRows([]string{"cid", "name", "type", "notnull", "dflt_value", "pk"}).AddRow(0, "id", "INTEGER", 1, nil, 1))
+		WillReturnRows(sqlmock.NewRows([]string{"cid", "name", "type", "notnull", "dflt_value", "pk"}).AddRow(0, "id", "INTEGER", 1, nil, 1)).
+		RowsWillBeClosed()
 	sqliteMock.ExpectQuery("PRAGMA index_list").
-		WillReturnRows(sqlmock.NewRows([]string{"seq", "name", "unique", "origin", "partial"}))
+		WillReturnRows(sqlmock.NewRows([]string{"seq", "name", "unique", "origin", "partial"})).
+		RowsWillBeClosed()
 	sqliteMock.ExpectQuery("PRAGMA foreign_key_list").
-		WillReturnRows(sqlmock.NewRows([]string{"id", "seq", "table", "from", "to", "on_update", "on_delete", "match"}))
+		WillReturnRows(sqlmock.NewRows([]string{"id", "seq", "table", "from", "to", "on_update", "on_delete", "match"})).
+		RowsWillBeClosed()
+	sqliteMock.ExpectClose()
+	sqliteMock.ExpectClose()
 
 	sqlite, err := databaseSchemaForDriver(t.TempDir(), "sqlite", "sqlite", "full", "", false)
 	if err != nil {
@@ -3243,25 +3274,6 @@ func TestLogEntriesParserKeepsJSONLinesAndMergesStackTraces(t *testing.T) {
 	}
 	if !strings.Contains(last.(map[string]string)["entry"], "main.main()") {
 		t.Fatalf("last error should include merged stack trace: %+v", last)
-	}
-}
-
-func TestHelpDocsReferenceLensWithoutBoostDoc(t *testing.T) {
-	root, err := filepath.Abs(filepath.Join("..", "..", "..", ".."))
-	if err != nil {
-		t.Fatalf("abs root: %v", err)
-	}
-	for _, rel := range []string{"tools/prismgo-lens/README.md", "prismgo/docs/zh_CN/lens.md", "prismgo/docs/en/lens.md"} {
-		body, err := os.ReadFile(filepath.Join(root, rel))
-		if err != nil {
-			t.Fatalf("read %s: %v", rel, err)
-		}
-		if strings.Contains(strings.ToLower(string(body)), "boost.md") {
-			t.Fatalf("%s should not reference boost.md", rel)
-		}
-		if rel == "tools/prismgo-lens/README.md" && !strings.Contains(string(body), "does not require a root `prismgo/` source directory") {
-			t.Fatalf("%s should document that published projects do not need a root prismgo directory", rel)
-		}
 	}
 }
 

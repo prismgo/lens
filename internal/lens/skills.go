@@ -51,7 +51,7 @@ func AddSkill(root string, source string, options AddSkillOptions) ([]AuditRepor
 	if LooksLikeGitHubSource(source) {
 		return AddGitHubSkillWithOptions(root, source, options)
 	}
-	report, installedName, err := installSkillDir(root, source, filepath.Base(filepath.Clean(source)), options)
+	report, installedName, err := installSkillDir(root, source, options)
 	if err != nil {
 		return []AuditReport{report}, nil, err
 	}
@@ -99,7 +99,7 @@ func ParseGitHubSkillSource(value string) (GitHubSkillSource, error) {
 	return source, nil
 }
 
-func AddGitHubSkillWithOptions(root string, value string, options AddSkillOptions) ([]AuditReport, []string, error) {
+func AddGitHubSkillWithOptions(root string, value string, options AddSkillOptions) (reports []AuditReport, installed []string, err error) {
 	source, err := ParseGitHubSkillSource(value)
 	if err != nil {
 		return nil, nil, err
@@ -108,7 +108,7 @@ func AddGitHubSkillWithOptions(root string, value string, options AddSkillOption
 	if err != nil {
 		return nil, nil, err
 	}
-	defer os.RemoveAll(temp)
+	defer mergeRemoveAllError(&err, temp)
 	if err := downloadGitHubZip(source, temp); err != nil {
 		return nil, nil, err
 	}
@@ -136,10 +136,10 @@ func AddGitHubSkillWithOptions(root string, value string, options AddSkillOption
 			return nil, names, errors.New("github skill source: multiple skills found; use --list, --skill NAME, or --all")
 		}
 	}
-	reports := make([]AuditReport, 0, len(candidates))
-	installed := make([]string, 0, len(candidates))
+	reports = make([]AuditReport, 0, len(candidates))
+	installed = make([]string, 0, len(candidates))
 	for i, candidate := range candidates {
-		report, installedName, err := installSkillDir(root, candidate.Path, candidate.Name, options)
+		report, installedName, err := installSkillDir(root, candidate.Path, options)
 		reports = append(reports, report)
 		if err != nil {
 			return reports, names[:i+1], err
@@ -152,7 +152,7 @@ func AddGitHubSkillWithOptions(root string, value string, options AddSkillOption
 	return reports, installed, nil
 }
 
-func downloadGitHubZip(source GitHubSkillSource, target string) error {
+func downloadGitHubZip(source GitHubSkillSource, target string) (err error) {
 	url := githubArchiveURL(source)
 	ctx, cancel := context.WithTimeout(context.Background(), githubDownloadTimeout)
 	defer cancel()
@@ -167,7 +167,7 @@ func downloadGitHubZip(source GitHubSkillSource, target string) error {
 		}
 		return err
 	}
-	defer response.Body.Close()
+	defer mergeCloseError(&err, response.Body.Close)
 	if response.StatusCode != http.StatusOK {
 		return fmt.Errorf("github skill source: download failed with status %s", response.Status)
 	}
@@ -177,7 +177,7 @@ func downloadGitHubZip(source GitHubSkillSource, target string) error {
 		return err
 	}
 	if _, err := io.Copy(file, io.LimitReader(response.Body, 50<<20)); err != nil {
-		file.Close()
+		mergeCloseError(&err, file.Close)
 		return err
 	}
 	if err := file.Close(); err != nil {
@@ -192,12 +192,12 @@ var githubArchiveURL = func(source GitHubSkillSource) string {
 
 var githubDownloadTimeout = 30 * time.Second
 
-func unzip(archivePath string, target string) error {
+func unzip(archivePath string, target string) (err error) {
 	reader, err := zip.OpenReader(archivePath)
 	if err != nil {
 		return err
 	}
-	defer reader.Close()
+	defer mergeCloseError(&err, reader.Close)
 	for _, file := range reader.File {
 		clean := filepath.Clean(file.Name)
 		if strings.Contains(clean, "..") {
@@ -223,10 +223,12 @@ func unzip(archivePath string, target string) error {
 		if err != nil {
 			return err
 		}
-		data, err := io.ReadAll(io.LimitReader(source, 5<<20))
-		source.Close()
-		if err != nil {
-			return err
+		data, readErr := io.ReadAll(io.LimitReader(source, 5<<20))
+		if closeErr := source.Close(); closeErr != nil {
+			readErr = errors.Join(readErr, closeErr)
+		}
+		if readErr != nil {
+			return readErr
 		}
 		if err := os.WriteFile(dest, data, 0o644); err != nil {
 			return err
@@ -236,12 +238,12 @@ func unzip(archivePath string, target string) error {
 }
 
 // DiscoverGitHubSkillsFromZip 读取 GitHub archive zip 并返回其中所有 skill 名称。
-func DiscoverGitHubSkillsFromZip(archivePath string, requestedPath string) ([]string, error) {
+func DiscoverGitHubSkillsFromZip(archivePath string, requestedPath string) (names []string, err error) {
 	temp, err := os.MkdirTemp("", "prismgo-lens-discover-*")
 	if err != nil {
 		return nil, err
 	}
-	defer os.RemoveAll(temp)
+	defer mergeRemoveAllError(&err, temp)
 	if err := unzip(archivePath, filepath.Join(temp, "src")); err != nil {
 		return nil, err
 	}
@@ -338,7 +340,7 @@ func candidateNamesFromPairs(candidates []skillCandidate) []string {
 	return names
 }
 
-func installSkillDir(root string, source string, name string, options AddSkillOptions) (AuditReport, string, error) {
+func installSkillDir(root string, source string, options AddSkillOptions) (AuditReport, string, error) {
 	report := AuditReport{Level: RiskLow}
 	var err error
 	if options.SkipAudit && !options.Force {
@@ -351,13 +353,13 @@ func installSkillDir(root string, source string, name string, options AddSkillOp
 	if err != nil {
 		return report, "", err
 	}
-	name = metadata.Name
+	name := metadata.Name
 	if !options.SkipAudit {
 		report, err = AuditSkill(source)
 		if err != nil {
 			return report, "", err
 		}
-		if report.Level == RiskCritical && !(options.Force && options.SkipAudit) {
+		if report.Level == RiskCritical && (!options.Force || !options.SkipAudit) {
 			return report, "", errors.New("add-skill: critical risk skill refused; rerun with --force --skip-audit after manual review")
 		}
 		if report.Level == RiskHigh && !options.Force {

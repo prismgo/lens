@@ -296,10 +296,6 @@ func writeJSONMCPWithKeyAndPlan(path string, key string, plan MCPCommandPlan) er
 	return os.WriteFile(path, append(data, '\n'), 0o644)
 }
 
-func writeCodexTOML(path string) error {
-	return writeCodexTOMLWithPlan(path, defaultMCPCommandPlan())
-}
-
 func writeCodexTOMLWithPlan(path string, plan MCPCommandPlan) error {
 	existingBytes, err := os.ReadFile(path)
 	if err != nil && !os.IsNotExist(err) {
