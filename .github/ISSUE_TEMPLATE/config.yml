@@ -1,8 +1,8 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Go.dev API Documentation
-    url: https://pkg.go.dev/github.com/prismgo/framework
-    about: API documentation for Prismgo packages.
-  - name: Prismgo Documentation
-    url: https://github.com/prismgo/framework/tree/main/docs
-    about: Project documentation and guides.
+  - name: Prismgo Lens Documentation
+    url: https://github.com/prismgo/lens#readme
+    about: Read usage notes and project context before opening an issue.
+  - name: Security Vulnerability Report
+    url: https://github.com/prismgo/lens/security/advisories/new
+    about: Report suspected vulnerabilities privately instead of opening a public issue.

@@ -3,6 +3,7 @@
 .vscode
 tmp/
 .coverage/
+dist/
 .claude
 .codex
 .trae
@@ -12,3 +13,4 @@ openspec/
 docs/superpowers/
 coverage.out
 docs/changes/
+skills-lock.json
