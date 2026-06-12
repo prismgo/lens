@@ -13,16 +13,35 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
+	survey "github.com/AlecAivazis/survey/v2"
 	"github.com/prismgo/lens/internal/lens"
+	"golang.org/x/term"
 )
 
 const maxToolOutputBytes = 1 << 20
 
 var executeToolSubprocess = defaultExecuteToolSubprocess
 var executablePath = os.Executable
+
+type supportedAgentOption struct {
+	Name        string
+	DisplayName string
+	Aliases     []string
+}
+
+var supportedAgentOptions = []supportedAgentOption{
+	{Name: "codex", DisplayName: "Codex"},
+	{Name: "claude_code", DisplayName: "Claude Code", Aliases: []string{"claude"}},
+	{Name: "cursor", DisplayName: "Cursor"},
+	{Name: "copilot", DisplayName: "GitHub Copilot"},
+	{Name: "opencode", DisplayName: "OpenCode"},
+	{Name: "kiro", DisplayName: "Kiro"},
+	{Name: "junie", DisplayName: "Junie"},
+}
 
 // writeLine writes CLI output and panics on writer failures because most CLI
 // print helpers do not have an error return channel.
@@ -287,7 +306,10 @@ func promptInstallOptions(project string, options lens.InstallOptions, stdin io.
 		}
 	}
 	reader := bufio.NewReader(stdin)
-	options.Agents = promptCSV(reader, stdout, "Agents", defaultAgents)
+	options.Agents, err = promptAgents(stdin, stdout, reader, defaultAgents)
+	if err != nil {
+		return options, err
+	}
 	options.Features.Guidelines = promptBool(reader, stdout, "Enable guidelines", options.Features.Guidelines)
 	options.Features.Skills = promptBool(reader, stdout, "Enable skills", options.Features.Skills)
 	options.Features.MCP = promptBool(reader, stdout, "Enable MCP", options.Features.MCP)
@@ -307,6 +329,109 @@ func promptInstallOptions(project string, options lens.InstallOptions, stdin io.
 	writeFormat(stdout, "Will write features: %s\n", featureList(options.Features))
 	printInstallWritePlan(stdout, root.Root, options)
 	return options, nil
+}
+
+func promptAgents(stdin io.Reader, stdout io.Writer, reader *bufio.Reader, defaults []string) ([]string, error) {
+	if canPromptAgentCheckbox(stdin, stdout) {
+		return promptAgentsCheckbox(stdin.(*os.File), stdout.(interface {
+			io.Writer
+			Fd() uintptr
+		}), supportedAgentOptions, defaults)
+	}
+	return promptAgentsFallback(reader, stdout, supportedAgentOptions, defaults)
+}
+
+func canPromptAgentCheckbox(stdin io.Reader, stdout io.Writer) bool {
+	in, ok := stdin.(*os.File)
+	if !ok || !term.IsTerminal(int(in.Fd())) {
+		return false
+	}
+	out, ok := stdout.(interface {
+		io.Writer
+		Fd() uintptr
+	})
+	return ok && term.IsTerminal(int(out.Fd()))
+}
+
+func promptAgentsCheckbox(stdin *os.File, stdout interface {
+	io.Writer
+	Fd() uintptr
+}, supported []supportedAgentOption, defaults []string) ([]string, error) {
+	options := make([]string, 0, len(supported))
+	descriptions := map[string]string{}
+	for _, agent := range supported {
+		options = append(options, agent.Name)
+		descriptions[agent.Name] = agent.DisplayName
+	}
+	selected := []string{}
+	prompt := &survey.MultiSelect{
+		Message:     "Select agents to install:",
+		Options:     options,
+		Default:     defaults,
+		Description: func(value string, _ int) string { return descriptions[value] },
+	}
+	if err := survey.AskOne(prompt, &selected, survey.WithStdio(stdin, stdout, os.Stderr)); err != nil {
+		return nil, err
+	}
+	return selected, nil
+}
+
+func promptAgentsFallback(reader *bufio.Reader, stdout io.Writer, supported []supportedAgentOption, defaults []string) ([]string, error) {
+	writeLine(stdout, "Supported agents:")
+	for i, agent := range supported {
+		writeFormat(stdout, "  %d) %s - %s\n", i+1, agent.Name, agent.DisplayName)
+	}
+	defaultText := strings.Join(defaults, ",")
+	if defaultText == "" {
+		defaultText = "none"
+	}
+	writeFormat(stdout, "Agents (comma-separated names or numbers) [%s]: ", defaultText)
+	line, _ := reader.ReadString('\n')
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return defaults, nil
+	}
+	if strings.EqualFold(line, "none") {
+		return nil, nil
+	}
+	selected := []string{}
+	seen := map[string]bool{}
+	for _, part := range strings.Split(line, ",") {
+		token := strings.TrimSpace(part)
+		if token == "" {
+			continue
+		}
+		name, err := resolveAgentSelection(token, supported)
+		if err != nil {
+			return nil, err
+		}
+		if !seen[name] {
+			seen[name] = true
+			selected = append(selected, name)
+		}
+	}
+	return selected, nil
+}
+
+func resolveAgentSelection(token string, supported []supportedAgentOption) (string, error) {
+	if index, err := strconv.Atoi(token); err == nil {
+		if index < 1 || index > len(supported) {
+			return "", fmt.Errorf("unsupported agent selection %q; choose a number from 1 to %d or an agent name", token, len(supported))
+		}
+		return supported[index-1].Name, nil
+	}
+	key := strings.ToLower(strings.TrimSpace(token))
+	for _, agent := range supported {
+		if key == agent.Name {
+			return agent.Name, nil
+		}
+		for _, alias := range agent.Aliases {
+			if key == alias {
+				return agent.Name, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("unsupported agent selection %q; choose a supported agent name or number", token)
 }
 
 func promptCSV(reader *bufio.Reader, stdout io.Writer, label string, defaults []string) []string {

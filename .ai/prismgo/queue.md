@@ -2,4 +2,4 @@
 
 - Keep job payloads serializable and version-tolerant.
 - Make retry and timeout behavior visible in queue configuration.
-- Use Horizon or queue diagnostics before guessing worker state.
+- Use read-only queue diagnostics before guessing worker state.

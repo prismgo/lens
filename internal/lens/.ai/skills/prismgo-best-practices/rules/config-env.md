@@ -30,7 +30,7 @@ driver := config.GetString("database.default", "mysql")
 
 ## Keep Config Namespaced
 
-Use top-level namespaces such as `cache`, `queue`, `horizon`, `session`, `filesystem`, `logger`, and `database`.
+Use top-level namespaces such as `cache`, `queue`, `session`, `filesystem`, `logger`, and `database`.
 
 Incorrect:
 

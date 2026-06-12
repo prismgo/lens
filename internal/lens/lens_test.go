@@ -642,8 +642,6 @@ func TestPrismGoBestPracticesRulesCarryPrismGoExamples(t *testing.T) {
 		"error-handling.md",
 		"events-notifications.md",
 		"filesystem.md",
-		"frontend-vue-vite.md",
-		"horizon.md",
 		"logging.md",
 		"provider-facade.md",
 		"queue-jobs.md",
@@ -806,7 +804,6 @@ func TestPublicGuidelinesAndSkillsWritersSyncCodexAssets(t *testing.T) {
 		".ai/lens/core.md",
 		".ai/go/core.md",
 		".ai/prismgo/core.md",
-		".ai/vue-vite/core.md",
 		".ai/guidelines/prismgo/core.md",
 		"AGENTS.md",
 		".ai/skills/prismgo-best-practices/SKILL.md",
@@ -824,6 +821,50 @@ func TestPublicGuidelinesAndSkillsWritersSyncCodexAssets(t *testing.T) {
 	if !strings.Contains(string(agents), blockStart) || !strings.Contains(string(agents), "Prismgo Lens Foundation") || !strings.Contains(string(agents), "PrismGo Core") {
 		t.Fatalf("AGENTS.md missing managed Prismgo Lens block:\n%s", agents)
 	}
+	for _, forbidden := range []string{"Horizon", "Vue/Vite", "vue-vite"} {
+		if strings.Contains(string(agents), forbidden) {
+			t.Fatalf("AGENTS.md should not include removed built-in asset guidance %q:\n%s", forbidden, agents)
+		}
+	}
+}
+
+func TestGeneratedAgentGuidelinesExcludeRemovedAIAssetTopics(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module host\n"), 0o644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+	for _, dir := range []string{"config", "web"} {
+		if err := os.MkdirAll(filepath.Join(root, dir), 0o755); err != nil {
+			t.Fatalf("mkdir %s: %v", dir, err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(root, "config", "queue.go"), []byte("package config\n"), 0o644); err != nil {
+		t.Fatalf("write queue config: %v", err)
+	}
+
+	if _, err := WriteGuidelines(root, agentDetectionOrder); err != nil {
+		t.Fatalf("write guidelines: %v", err)
+	}
+	seenGuidelinePaths := map[string]bool{}
+	for _, agent := range agentsFromNames(agentDetectionOrder) {
+		if seenGuidelinePaths[agent.GuidelinesPath] {
+			continue
+		}
+		seenGuidelinePaths[agent.GuidelinesPath] = true
+		body, err := os.ReadFile(filepath.Join(root, agent.GuidelinesPath))
+		if err != nil {
+			t.Fatalf("read %s: %v", agent.GuidelinesPath, err)
+		}
+		text := string(body)
+		if !strings.Contains(text, "Use PrismGo queue docs and read-only diagnostics") {
+			t.Fatalf("%s should keep queue project signal without removed topics:\n%s", agent.GuidelinesPath, text)
+		}
+		for _, forbidden := range []string{"Horizon", "Vue/Vite", "vue-vite"} {
+			if strings.Contains(text, forbidden) {
+				t.Fatalf("%s should not include removed built-in asset guidance %q:\n%s", agent.GuidelinesPath, forbidden, text)
+			}
+		}
+	}
 }
 
 func TestBuiltinAIAssetsUseBoostLikeTreeAndProjectGuidelineOverride(t *testing.T) {
@@ -838,11 +879,9 @@ func TestBuiltinAIAssetsUseBoostLikeTreeAndProjectGuidelineOverride(t *testing.T
 		".ai/prismgo/schema.md",
 		".ai/prismgo/cache.md",
 		".ai/prismgo/queue.md",
-		".ai/prismgo/horizon.md",
 		".ai/prismgo/session-cookie.md",
 		".ai/prismgo/logger.md",
 		".ai/prismgo/filesystem.md",
-		".ai/vue-vite/core.md",
 		".ai/testing/enforce-tests.md",
 	} {
 		data, err := builtinAIAssets.ReadFile(path)
@@ -851,6 +890,16 @@ func TestBuiltinAIAssetsUseBoostLikeTreeAndProjectGuidelineOverride(t *testing.T
 		}
 		if strings.TrimSpace(string(data)) == "" {
 			t.Fatalf("embedded guideline %s must not be empty", path)
+		}
+	}
+	for _, path := range []string{
+		".ai/prismgo/horizon.md",
+		".ai/vue-vite/core.md",
+		".ai/skills/prismgo-best-practices/rules/horizon.md",
+		".ai/skills/prismgo-best-practices/rules/frontend-vue-vite.md",
+	} {
+		if _, err := builtinAIAssets.ReadFile(path); err == nil {
+			t.Fatalf("removed embedded guideline %s should not be present", path)
 		}
 	}
 

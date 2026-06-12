@@ -39,7 +39,6 @@ Load only the files relevant to the task:
 - `rules/migrations.md` - migration generation, foreign keys, immutable deployed migrations, indexes, defaults, rollback, and focused changes.
 - `rules/db-performance.md` - eager loading, column selection, batching, indexes, aggregate counts, streaming, and query placement.
 - `rules/queue-jobs.md` - jobs, dispatch options, middleware, batches, failures, and queue diagnostics.
-- `rules/horizon.md` - Horizon configuration, supervisors, observability, dashboard, and process safety.
 - `rules/scheduling.md` - scheduler overlap locks, multi-server coordination, queued long work, environment gates, timeouts, and shared registration helpers.
 - `rules/caching.md` - cache repositories, typed reads, stores, locks, tags, memoization, and stampede control.
 - `rules/config-env.md` - config registration, env boundaries, config helpers, and secret redaction.
@@ -51,7 +50,6 @@ Load only the files relevant to the task:
 - `rules/translation.md` - translation keys, namespaces, locale resolution, pluralization, and missing keys.
 - `rules/session-cookie.md` - session middleware, request stores, flash data, cookie queues, signing, and encryption.
 - `rules/validation.md` - Gin request binding, boundary validation, and validation tests.
-- `rules/frontend-vue-vite.md` - Vue/Vite conventions for PrismGo-served frontend assets.
 - `rules/testing-coverage.md` - package-focused tests, Lens tests, coverage expectations, and regression shape.
 - `rules/security.md` - read-only SQL, diagnostics, browser logs, secrets, and generated AI assets.
 - `rules/style.md` - local Go style, comments, public APIs, and small focused changes.

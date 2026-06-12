@@ -85,7 +85,7 @@ Comments:
 
 ## Testing Guidelines
 
-Add or update colocated `*_test.go` files for behavior changes. Use focused unit tests for package contracts and integration-style tests for cross-component behavior such as queue, Redis, RabbitMQ, Horizon, or filesystem flows. Run `make test` before submitting; CI uploads `coverage.out`, so do not bypass `make test` for final verification.
+Add or update colocated `*_test.go` files for behavior changes. Use focused unit tests for package contracts and integration-style tests for cross-component behavior such as queue, Redis, RabbitMQ, or filesystem flows. Run `make test` before submitting; CI uploads `coverage.out`, so do not bypass `make test` for final verification.
 
 ### Testing and Coverage
 

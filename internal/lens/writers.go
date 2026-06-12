@@ -414,11 +414,8 @@ func isTestingGuidelinePath(path string) bool {
 
 func builtinProjectGuideline(root string) string {
 	rules := []string{}
-	if fileExists(filepath.Join(root, "config", "horizon.go")) || fileExists(filepath.Join(root, "config", "queue.go")) {
-		rules = append(rules, "- Use PrismGo Horizon docs and queue observability patterns when touching queue workers.")
-	}
-	if dirExists(filepath.Join(root, "web")) {
-		rules = append(rules, "- Frontend changes should follow the existing Vue/Vite application structure under `web/`.")
+	if fileExists(filepath.Join(root, "config", "queue.go")) {
+		rules = append(rules, "- Use PrismGo queue docs and read-only diagnostics when touching queue workers.")
 	}
 	if len(rules) == 0 {
 		return ""

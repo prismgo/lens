@@ -62,7 +62,7 @@ queue.UseMiddleware(
 
 ## Keep Diagnostics Read-Only
 
-Queue diagnostics may read configuration, connection names, queue sizes, failed job summaries, and Horizon health. They must not dispatch jobs, retry jobs, clear queues, or request worker restarts.
+Queue diagnostics may read configuration, connection names, queue sizes, failed job summaries, and worker health. They must not dispatch jobs, retry jobs, clear queues, or request worker restarts.
 
 Incorrect:
 

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -675,6 +676,106 @@ func TestRunInstallInteractiveWizardPersistsSelections(t *testing.T) {
 			t.Fatalf("interactive wizard missing %q: %s", want, stdout.String())
 		}
 	}
+}
+
+func TestRunInstallInteractiveAgentSelectionSupportsNumberMultiSelect(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module host\n"), 0o644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+	input := strings.NewReader("1,2\nY\nY\nY\nn\nn\nn\n\n")
+	var stdout, stderr bytes.Buffer
+	code := Run([]string{"prismgo-lens", "--project", root, "install", "--interactive"}, input, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("interactive install exit=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
+	}
+	config, err := lens.ReadConfig(root)
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	if strings.Join(config.Agents, ",") != "claude_code,codex" {
+		t.Fatalf("number selection should persist selected agents: %+v", config.Agents)
+	}
+	for _, path := range []string{"AGENTS.md", "CLAUDE.md", ".agents/skills/prismgo-best-practices/SKILL.md", ".claude/skills/prismgo-best-practices/SKILL.md"} {
+		if !fileExists(filepath.Join(root, path)) {
+			t.Fatalf("number selection should write %s", path)
+		}
+	}
+	for _, want := range []string{"Supported agents:", "1) codex - Codex", "2) claude_code - Claude Code", "Agents (comma-separated names or numbers)"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("interactive output missing %q: %s", want, stdout.String())
+		}
+	}
+}
+
+func TestRunInstallInteractiveAgentSelectionRejectsInvalidInput(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module host\n"), 0o644); err != nil {
+		t.Fatalf("write go.mod: %v", err)
+	}
+	var stdout, stderr bytes.Buffer
+	code := Run([]string{"prismgo-lens", "--project", root, "install", "--interactive"}, strings.NewReader("Y\n"), &stdout, &stderr)
+	if code == 0 {
+		t.Fatalf("invalid agent selection should fail: stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stderr.String(), `unsupported agent selection "Y"`) {
+		t.Fatalf("invalid agent selection should explain failure: stdout=%s stderr=%s", stdout.String(), stderr.String())
+	}
+	if fileExists(filepath.Join(root, ".prismgo-lens.json")) {
+		t.Fatalf("invalid agent selection must not write config")
+	}
+}
+
+func TestPromptAgentSelectionHelpersCoverFallbackBranches(t *testing.T) {
+	t.Run("prompt fallback deduplicates numbers names and aliases", func(t *testing.T) {
+		reader := bufio.NewReader(strings.NewReader("1,codex,claude\n"))
+		var stdout bytes.Buffer
+		agents, err := promptAgentsFallback(reader, &stdout, supportedAgentOptions, nil)
+		if err != nil {
+			t.Fatalf("prompt agents fallback: %v", err)
+		}
+		if strings.Join(agents, ",") != "codex,claude_code" {
+			t.Fatalf("unexpected agents: %+v", agents)
+		}
+		if !strings.Contains(stdout.String(), "Supported agents:") || !strings.Contains(stdout.String(), "7) junie - Junie") {
+			t.Fatalf("fallback should list supported agents: %s", stdout.String())
+		}
+	})
+
+	t.Run("prompt fallback accepts default and none", func(t *testing.T) {
+		reader := bufio.NewReader(strings.NewReader("\n"))
+		agents, err := promptAgentsFallback(reader, io.Discard, supportedAgentOptions, []string{"cursor"})
+		if err != nil || strings.Join(agents, ",") != "cursor" {
+			t.Fatalf("empty answer should keep default: agents=%+v err=%v", agents, err)
+		}
+		reader = bufio.NewReader(strings.NewReader("none\n"))
+		agents, err = promptAgentsFallback(reader, io.Discard, supportedAgentOptions, []string{"cursor"})
+		if err != nil || len(agents) != 0 {
+			t.Fatalf("none answer should clear agents: agents=%+v err=%v", agents, err)
+		}
+	})
+
+	t.Run("selection rejects out of range numbers and unknown names", func(t *testing.T) {
+		for _, token := range []string{"0", "8", "missing"} {
+			if _, err := resolveAgentSelection(token, supportedAgentOptions); err == nil {
+				t.Fatalf("selection %q should fail", token)
+			}
+		}
+	})
+
+	t.Run("terminal detection rejects non terminal streams", func(t *testing.T) {
+		if canPromptAgentCheckbox(strings.NewReader(""), io.Discard) {
+			t.Fatal("non-file streams must use fallback prompt")
+		}
+		file, err := os.CreateTemp(t.TempDir(), "stdin")
+		if err != nil {
+			t.Fatalf("create temp file: %v", err)
+		}
+		defer closeTestResource(t, "temp file", file.Close)
+		if canPromptAgentCheckbox(file, io.Discard) {
+			t.Fatal("regular files must use fallback prompt")
+		}
+	})
 }
 
 func TestRunUpdateDryRunWithoutConfigUsesDefaultPreviewAndDoesNotWrite(t *testing.T) {
