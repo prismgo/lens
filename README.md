@@ -1,6 +1,6 @@
-# Prismgo Lens
+# PrismGo Lens
 
-Prismgo Lens is a development-only helper module for PrismGo projects. It aligns the local developer experience with Laravel Boost while keeping MCP, Agent config, documentation search, browser logs, and skill auditing outside the production application build.
+PrismGo Lens is a development-only helper module for PrismGo projects. It aligns the local developer experience with Laravel Boost while keeping MCP, Agent config, documentation search, browser logs, and skill auditing outside the production application build.
 
 ## Install
 
