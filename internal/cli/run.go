@@ -83,7 +83,7 @@ func printHelp(w io.Writer) {
 	writeLine(w, "Prismgo Lens development tooling")
 	writeLine(w)
 	writeLine(w, "Usage:")
-	writeLine(w, "  prismgolens [--project PATH] <command>")
+	writeLine(w, "  prismgo-lens [--project PATH] <command>")
 	writeLine(w)
 	writeLine(w, "Commands:")
 	writeLine(w, "  install        install guidelines, skills, and MCP config")

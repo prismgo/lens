@@ -282,11 +282,11 @@ func installMCPCommandPlan(options InstallOptions) (MCPCommandPlan, error) {
 	if strings.HasSuffix(filepath.Base(executable), ".test") {
 		return defaultMCPCommandPlan(), nil
 	}
-	found, err := installLookPath("prismgolens")
+	found, err := installLookPath("prismgo-lens")
 	commandFound := err == nil && found != ""
 	return MCPCommandPlanForInstall(MCPCommandOptions{
 		Mode:               options.MCPCommandMode,
-		CommandName:        "prismgolens",
+		CommandName:        "prismgo-lens",
 		ExecutablePath:     executable,
 		CommandFoundInPath: commandFound,
 	}), nil

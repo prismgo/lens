@@ -321,7 +321,7 @@ func writeCodexTOMLWithPlan(path string, plan MCPCommandPlan) error {
 func defaultMCPCommandPlan() MCPCommandPlan {
 	return MCPCommandPlanForInstall(MCPCommandOptions{
 		Mode:               MCPCommandName,
-		CommandName:        "prismgolens",
+		CommandName:        "prismgo-lens",
 		CommandFoundInPath: true,
 	})
 }

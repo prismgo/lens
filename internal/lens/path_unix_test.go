@@ -89,7 +89,7 @@ func TestWritePATHProfileBlockCreatesNewFile(t *testing.T) {
 
 func TestWritePATHProfileBlockReplacesDuplicateManagedBlocks(t *testing.T) {
 	path := filepath.Join(t.TempDir(), ".profile")
-	existing := "before\n# >>> prismgolens PATH >>>\none\n# <<< prismgolens PATH <<<\nmiddle\n# >>> prismgolens PATH >>>\ntwo\n# <<< prismgolens PATH <<<\nafter\n"
+	existing := "before\n# >>> prismgo-lens PATH >>>\none\n# <<< prismgo-lens PATH <<<\nmiddle\n# >>> prismgo-lens PATH >>>\ntwo\n# <<< prismgo-lens PATH <<<\nafter\n"
 	if err := os.WriteFile(path, []byte(existing), 0o644); err != nil {
 		t.Fatalf("write profile: %v", err)
 	}

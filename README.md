@@ -7,13 +7,13 @@ Prismgo Lens is a development-only helper module for PrismGo projects. It aligns
 Install the Prismgo Lens CLI:
 
 ```bash
-go install github.com/prismgo/lens/cmd/prismgolens@latest
+go install github.com/prismgo/lens/cmd/prismgo-lens@latest
 ```
 
 Run from a PrismGo project root:
 
 ```bash
-prismgolens install
+prismgo-lens install
 ```
 
 The installer detects supported Agent config files, writes shared `.prismgo-lens.json` and local `.prismgo-lens.local.json`, creates `.ai/guidelines` and `.ai/skills`, merges MCP server config for detected Agents, and automatically adds the Lens binary directory to the user PATH when needed.
@@ -28,28 +28,28 @@ When working inside the PrismGo repository before Lens is published, use the sou
 go -C tools/prismgo-lens run . --project ../.. install
 ```
 
-This is a development-only workflow. Published projects should use `prismgolens install`.
+This is a development-only workflow. Published projects should use `prismgo-lens install`.
 
 ## Commands
 
 ```bash
-prismgolens --help
-prismgolens install
-prismgolens install --interactive
-prismgolens install --dry-run --no-interaction --agent codex --guidelines --mcp
-prismgolens install --no-interaction --agent codex --package-module example.com/prismgo/pkg
-prismgolens doctor
-prismgolens update
-prismgolens update --dry-run --ignore-skills
-prismgolens mcp
-prismgolens execute-tool application-info e30=
-prismgolens browser-proxy --target http://127.0.0.1:8051 --listen 127.0.0.1:8052
-prismgolens list-skills
-prismgolens add-skill /path/to/local/skill
-prismgolens add-skill owner/repo/path/to/skill
-prismgolens add-skill owner/repo --list
-prismgolens add-skill owner/repo --skill skill-name
-prismgolens add-skill owner/repo --all
+prismgo-lens --help
+prismgo-lens install
+prismgo-lens install --interactive
+prismgo-lens install --dry-run --no-interaction --agent codex --guidelines --mcp
+prismgo-lens install --no-interaction --agent codex --package-module example.com/prismgo/pkg
+prismgo-lens doctor
+prismgo-lens update
+prismgo-lens update --dry-run --ignore-skills
+prismgo-lens mcp
+prismgo-lens execute-tool application-info e30=
+prismgo-lens browser-proxy --target http://127.0.0.1:8051 --listen 127.0.0.1:8052
+prismgo-lens list-skills
+prismgo-lens add-skill /path/to/local/skill
+prismgo-lens add-skill owner/repo/path/to/skill
+prismgo-lens add-skill owner/repo --list
+prismgo-lens add-skill owner/repo --skill skill-name
+prismgo-lens add-skill owner/repo --all
 ```
 
 `install --dry-run` does not write files. When MCP is enabled, it prints the selected Agent MCP install plans, including strategy, config path, and stdio command.
@@ -88,7 +88,7 @@ First version tools:
 - Production `go build .` does not import or compile this module.
 - MCP calls go through the registered tool allowlist.
 - MCP `tools/call` executes `execute-tool` in a subprocess with timeout and output limits.
-- Generated MCP config runs `prismgolens --project . mcp` or an absolute `prismgolens` executable path, so tools resolve the host project instead of the Lens module.
+- Generated MCP config runs `prismgo-lens --project . mcp` or an absolute `prismgo-lens` executable path, so tools resolve the host project instead of the Lens module.
 - Codex TOML and JSON MCP config preserve unrelated servers and user keys while replacing only the `prismgo-lens` server. Corrupt JSON config, or non-object `mcpServers` / `servers`, is refused without rewriting the file.
 - `database-connections` reads `config/database.go` plus `.env`, resolves env defaults, and redacts secrets.
 - `application-info` includes a PrismGo roster with root module, Go directive, Go packages and replacements, frontend packages, and framework feature signals.

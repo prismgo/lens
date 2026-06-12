@@ -8,7 +8,7 @@ type DoctorReport struct {
 	Warnings    []string
 }
 
-// Doctor 检查项目根、当前可执行文件和 prismgolens 是否已进入 PATH。
+// Doctor 检查项目根、当前可执行文件和 prismgo-lens 是否已进入 PATH。
 func Doctor(project string) (DoctorReport, error) {
 	root, err := DetectProject(project)
 	if err != nil {
@@ -19,7 +19,7 @@ func Doctor(project string) (DoctorReport, error) {
 		executable = "unknown"
 	}
 	status := "missing"
-	if found, err := installLookPath("prismgolens"); err == nil && found != "" {
+	if found, err := installLookPath("prismgo-lens"); err == nil && found != "" {
 		status = "ok"
 	}
 	report := DoctorReport{
@@ -28,7 +28,7 @@ func Doctor(project string) (DoctorReport, error) {
 		PathStatus:  status,
 	}
 	if status != "ok" {
-		report.Warnings = append(report.Warnings, "prismgolens is not visible in the current PATH; installed MCP config may use an absolute command path until a new shell is opened")
+		report.Warnings = append(report.Warnings, "prismgo-lens is not visible in the current PATH; installed MCP config may use an absolute command path until a new shell is opened")
 	}
 	return report, nil
 }

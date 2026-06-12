@@ -11,8 +11,8 @@ const (
 	MCPCommandAbsolute = "absolute"
 )
 
-const pathBlockStart = "# >>> prismgolens PATH >>>"
-const pathBlockEnd = "# <<< prismgolens PATH <<<"
+const pathBlockStart = "# >>> prismgo-lens PATH >>>"
+const pathBlockEnd = "# <<< prismgo-lens PATH <<<"
 
 // UserPATHStore 抽象当前用户 PATH 的读写位置，Windows 实现使用注册表。
 type UserPATHStore interface {
@@ -24,7 +24,7 @@ type UserPATHStore interface {
 type MCPCommandOptions struct {
 	// Mode 指定命令选择模式，空值时按 auto 处理。
 	Mode string
-	// CommandName 是期望写入配置的短命令名，通常是 prismgolens。
+	// CommandName 是期望写入配置的短命令名，通常是 prismgo-lens。
 	CommandName string
 	// ExecutablePath 是当前机器探测到的可执行文件绝对路径。
 	ExecutablePath string
@@ -45,9 +45,9 @@ type MCPCommandPlan struct {
 // MCPCommandPlanForInstall 根据本机探测结果生成 Prismgo Lens MCP 安装命令。
 func MCPCommandPlanForInstall(options MCPCommandOptions) MCPCommandPlan {
 	mode := firstNonEmpty(options.Mode, MCPCommandAuto)
-	name := firstNonEmpty(options.CommandName, "prismgolens")
+	name := firstNonEmpty(options.CommandName, "prismgo-lens")
 	args := []string{"--project", ".", "mcp"}
-	fallback := MCPCommandPlan{Command: "go", Args: []string{"run", "github.com/prismgo/lens/cmd/prismgolens@latest", "--project", ".", "mcp"}, Source: "go-run-dev"}
+	fallback := MCPCommandPlan{Command: "go", Args: []string{"run", "github.com/prismgo/lens/cmd/prismgo-lens@latest", "--project", ".", "mcp"}, Source: "go-run-dev"}
 	if mode == MCPCommandName {
 		return MCPCommandPlan{Command: name, Args: args, Source: "path-name"}
 	}

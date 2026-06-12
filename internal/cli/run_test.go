@@ -595,7 +595,7 @@ func TestRunInstallDryRunAndFlagsDoNotWriteFiles(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("dry-run install exit=%d stderr=%s", code, stderr.String())
 	}
-	for _, want := range []string{"Dry run: true", "Agents: codex", "Features: guidelines, mcp", "PATH fix: enabled", "MCP install plans:", "codex: strategy=file config=.codex/config.toml command=prismgolens --project . mcp", "Selected package modules: example.com/prismgo/pkg"} {
+	for _, want := range []string{"Dry run: true", "Agents: codex", "Features: guidelines, mcp", "PATH fix: enabled", "MCP install plans:", "codex: strategy=file config=.codex/config.toml command=prismgo-lens --project . mcp", "Selected package modules: example.com/prismgo/pkg"} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("dry-run output missing %q: %s", want, stdout.String())
 		}
@@ -615,7 +615,7 @@ func TestInstallAcceptsNoFixPathAndMCPCommandMode(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	code := Run([]string{"prismgolens", "--project", root, "install", "--no-interaction", "--no-fix-path", "--mcp-command", "name", "--agent", "codex", "--mcp"}, strings.NewReader(""), &stdout, &stderr)
+	code := Run([]string{"prismgo-lens", "--project", root, "install", "--no-interaction", "--no-fix-path", "--mcp-command", "name", "--agent", "codex", "--mcp"}, strings.NewReader(""), &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("install failed: code=%d stdout=%s stderr=%s", code, stdout.String(), stderr.String())
 	}
@@ -632,7 +632,7 @@ func TestDoctorReportsProjectAndPathStatus(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	code := Run([]string{"prismgolens", "--project", root, "doctor"}, strings.NewReader(""), &stdout, &stderr)
+	code := Run([]string{"prismgo-lens", "--project", root, "doctor"}, strings.NewReader(""), &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("doctor failed: code=%d stderr=%s", code, stderr.String())
 	}

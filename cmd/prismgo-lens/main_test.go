@@ -15,6 +15,9 @@ func TestRunHelpListsPublicCommands(t *testing.T) {
 		t.Fatalf("run help exit = %d, want 0; output=%s", code, stdout.String())
 	}
 	output := stdout.String()
+	if !strings.Contains(output, "prismgo-lens [--project PATH] <command>") {
+		t.Fatalf("help output missing formal command name: %s", output)
+	}
 	for _, command := range []string{"install", "update", "mcp", "execute-tool", "browser-proxy", "add-skill", "list-skills"} {
 		if !strings.Contains(output, command) {
 			t.Fatalf("help output missing %q: %s", command, output)

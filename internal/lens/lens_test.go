@@ -131,7 +131,7 @@ func TestInstallRepairsPATHAndWritesAbsoluteMCPCommandWhenCommandMissing(t *test
 	if err := os.WriteFile(filepath.Join(root, "go.mod"), []byte("module host\n"), 0o644); err != nil {
 		t.Fatalf("write go.mod: %v", err)
 	}
-	executable := filepath.Join(t.TempDir(), "prismgolens")
+	executable := filepath.Join(t.TempDir(), "prismgo-lens")
 	wrotePATH := ""
 	installExecutablePath = func() (string, error) { return executable, nil }
 	installLookPath = func(string) (string, error) { return "", os.ErrNotExist }
@@ -239,8 +239,8 @@ func TestAgentMCPInstallPlansExposeStrategyAndStructuredCommand(t *testing.T) {
 		joined += fmt.Sprintf("%s %s %s %s %s\n", plan.Agent, plan.DisplayName, plan.Strategy, plan.ConfigPath, strings.Join(append([]string{plan.Command}, plan.Args...), " "))
 	}
 	for _, want := range []string{
-		"claude_code Claude Code file .mcp.json prismgolens --project . mcp",
-		"codex Codex file .codex/config.toml prismgolens --project . mcp",
+		"claude_code Claude Code file .mcp.json prismgo-lens --project . mcp",
+		"codex Codex file .codex/config.toml prismgo-lens --project . mcp",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Fatalf("MCP install plans missing %q:\n%s", want, joined)
@@ -486,11 +486,11 @@ func TestCustomAgentConfigWritesGuidelinesSkillsAndMCP(t *testing.T) {
 }
 
 func TestReplaceManagedPATHBlockIsIdempotent(t *testing.T) {
-	existing := "before\n# >>> prismgolens PATH >>>\nold\n# <<< prismgolens PATH <<<\nafter\n"
+	existing := "before\n# >>> prismgo-lens PATH >>>\nold\n# <<< prismgo-lens PATH <<<\nafter\n"
 	next := replaceManagedPATHBlock(existing, `export PATH="$PATH:$HOME/go/bin"`)
 	next = replaceManagedPATHBlock(next, `export PATH="$PATH:$HOME/go/bin"`)
 
-	if strings.Count(next, "# >>> prismgolens PATH >>>") != 1 {
+	if strings.Count(next, "# >>> prismgo-lens PATH >>>") != 1 {
 		t.Fatalf("managed block should appear once:\n%s", next)
 	}
 	if strings.Contains(next, "old") {
@@ -502,10 +502,10 @@ func TestReplaceManagedPATHBlockIsIdempotent(t *testing.T) {
 }
 
 func TestReplaceManagedPATHBlockRemovesDuplicateBlocks(t *testing.T) {
-	existing := "before\n# >>> prismgolens PATH >>>\none\n# <<< prismgolens PATH <<<\nmiddle\n# >>> prismgolens PATH >>>\ntwo\n# <<< prismgolens PATH <<<\nafter\n"
+	existing := "before\n# >>> prismgo-lens PATH >>>\none\n# <<< prismgo-lens PATH <<<\nmiddle\n# >>> prismgo-lens PATH >>>\ntwo\n# <<< prismgo-lens PATH <<<\nafter\n"
 	next := replaceManagedPATHBlock(existing, `export PATH="$PATH:$HOME/go/bin"`)
 
-	if strings.Count(next, "# >>> prismgolens PATH >>>") != 1 || strings.Count(next, "# <<< prismgolens PATH <<<") != 1 {
+	if strings.Count(next, "# >>> prismgo-lens PATH >>>") != 1 || strings.Count(next, "# <<< prismgo-lens PATH <<<") != 1 {
 		t.Fatalf("managed block should appear once:\n%s", next)
 	}
 	if strings.Contains(next, "one") || strings.Contains(next, "two") {
@@ -742,7 +742,7 @@ func TestMCPConfigUsesHostProjectFromLensModuleAndPreservesExistingConfig(t *tes
 		t.Fatalf("read toml: %v", err)
 	}
 	toml := string(tomlBytes)
-	for _, want := range []string{`model = "gpt-5"`, "[mcp_servers.other]", "[profiles.dev]", `command = "prismgolens"`, `args = ["--project", ".", "mcp"]`} {
+	for _, want := range []string{`model = "gpt-5"`, "[mcp_servers.other]", "[profiles.dev]", `command = "prismgo-lens"`, `args = ["--project", ".", "mcp"]`} {
 		if !strings.Contains(toml, want) {
 			t.Fatalf("codex toml missing %q:\n%s", want, toml)
 		}
@@ -997,7 +997,7 @@ func TestJSONMCPConfigRejectsCorruptOrWrongShapeWithoutRewriting(t *testing.T) {
 
 func TestMCPWritersUseProvidedCommandPlan(t *testing.T) {
 	root := t.TempDir()
-	plan := MCPCommandPlan{Command: "/tmp/prismgolens", Args: []string{"--project", ".", "mcp"}, Source: "absolute-executable"}
+	plan := MCPCommandPlan{Command: "/tmp/prismgo-lens", Args: []string{"--project", ".", "mcp"}, Source: "absolute-executable"}
 
 	jsonPath := filepath.Join(root, ".mcp.json")
 	if err := writeJSONMCPWithKeyAndPlan(jsonPath, "mcpServers", plan); err != nil {
@@ -1024,7 +1024,7 @@ func TestMCPWritersUseProvidedCommandPlan(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read codex toml: %v", err)
 	}
-	for _, want := range []string{`command = "/tmp/prismgolens"`, `args = ["--project", ".", "mcp"]`} {
+	for _, want := range []string{`command = "/tmp/prismgo-lens"`, `args = ["--project", ".", "mcp"]`} {
 		if !strings.Contains(string(tomlBytes), want) {
 			t.Fatalf("codex toml missing %q:\n%s", want, tomlBytes)
 		}
@@ -3388,13 +3388,13 @@ func writeZipWithModes(t *testing.T, path string, modes map[string]uint32) {
 func TestMCPCommandPlanPrefersPathCommand(t *testing.T) {
 	plan := MCPCommandPlanForInstall(MCPCommandOptions{
 		Mode:               MCPCommandAuto,
-		CommandName:        "prismgolens",
-		ExecutablePath:     "/home/dev/go/bin/prismgolens",
+		CommandName:        "prismgo-lens",
+		ExecutablePath:     "/home/dev/go/bin/prismgo-lens",
 		CommandFoundInPath: true,
 	})
 
-	if plan.Command != "prismgolens" {
-		t.Fatalf("command = %q, want prismgolens", plan.Command)
+	if plan.Command != "prismgo-lens" {
+		t.Fatalf("command = %q, want prismgo-lens", plan.Command)
 	}
 	if strings.Join(plan.Args, " ") != "--project . mcp" {
 		t.Fatalf("args = %v", plan.Args)
@@ -3407,12 +3407,12 @@ func TestMCPCommandPlanPrefersPathCommand(t *testing.T) {
 func TestMCPCommandPlanFallsBackToAbsoluteExecutable(t *testing.T) {
 	plan := MCPCommandPlanForInstall(MCPCommandOptions{
 		Mode:               MCPCommandAuto,
-		CommandName:        "prismgolens",
-		ExecutablePath:     "/tmp/prismgolens",
+		CommandName:        "prismgo-lens",
+		ExecutablePath:     "/tmp/prismgo-lens",
 		CommandFoundInPath: false,
 	})
 
-	if plan.Command != "/tmp/prismgolens" {
+	if plan.Command != "/tmp/prismgo-lens" {
 		t.Fatalf("command = %q, want absolute executable", plan.Command)
 	}
 	if plan.Source != "absolute-executable" {
@@ -3423,12 +3423,12 @@ func TestMCPCommandPlanFallsBackToAbsoluteExecutable(t *testing.T) {
 func TestMCPCommandPlanExplicitNameUsesPathCommand(t *testing.T) {
 	plan := MCPCommandPlanForInstall(MCPCommandOptions{
 		Mode:               MCPCommandName,
-		CommandName:        "prismgolens",
+		CommandName:        "prismgo-lens",
 		CommandFoundInPath: false,
 	})
 
-	if plan.Command != "prismgolens" {
-		t.Fatalf("command = %q, want prismgolens", plan.Command)
+	if plan.Command != "prismgo-lens" {
+		t.Fatalf("command = %q, want prismgo-lens", plan.Command)
 	}
 	if plan.Source != "path-name" {
 		t.Fatalf("source = %q, want path-name", plan.Source)
@@ -3438,11 +3438,11 @@ func TestMCPCommandPlanExplicitNameUsesPathCommand(t *testing.T) {
 func TestMCPCommandPlanExplicitAbsoluteUsesExecutablePath(t *testing.T) {
 	plan := MCPCommandPlanForInstall(MCPCommandOptions{
 		Mode:           MCPCommandAbsolute,
-		CommandName:    "prismgolens",
-		ExecutablePath: "/opt/prismgolens",
+		CommandName:    "prismgo-lens",
+		ExecutablePath: "/opt/prismgo-lens",
 	})
 
-	if plan.Command != "/opt/prismgolens" {
+	if plan.Command != "/opt/prismgo-lens" {
 		t.Fatalf("command = %q, want absolute executable", plan.Command)
 	}
 	if plan.Source != "absolute-executable" {
@@ -3453,14 +3453,14 @@ func TestMCPCommandPlanExplicitAbsoluteUsesExecutablePath(t *testing.T) {
 func TestMCPCommandPlanExplicitAbsoluteWithoutExecutableFallsBackToGoRun(t *testing.T) {
 	plan := MCPCommandPlanForInstall(MCPCommandOptions{
 		Mode:               MCPCommandAbsolute,
-		CommandName:        "prismgolens",
+		CommandName:        "prismgo-lens",
 		CommandFoundInPath: true,
 	})
 
 	if plan.Command != "go" {
 		t.Fatalf("command = %q, want go", plan.Command)
 	}
-	wantArgs := "run github.com/prismgo/lens/cmd/prismgolens@latest --project . mcp"
+	wantArgs := "run github.com/prismgo/lens/cmd/prismgo-lens@latest --project . mcp"
 	if strings.Join(plan.Args, " ") != wantArgs {
 		t.Fatalf("args = %v, want %s", plan.Args, wantArgs)
 	}
