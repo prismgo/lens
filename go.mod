@@ -7,10 +7,10 @@ require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/go-sql-driver/mysql v1.10.0
 	github.com/lib/pq v1.12.3
-	github.com/pelletier/go-toml/v2 v2.3.1
+	github.com/pelletier/go-toml/v2 v2.4.0
 	go.yaml.in/yaml/v3 v3.0.4
-	golang.org/x/sys v0.42.0
-	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211
+	golang.org/x/sys v0.46.0
+	golang.org/x/term v0.44.0
 	modernc.org/sqlite v1.52.0
 )
 
